@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { supabase } from "./supabaseClient";
 
 // ── Default scale labels (English) ──
 const defaultLabels = [
@@ -37,7 +38,9 @@ export default function AdminPage({ onSave, t }) {
   const [showPreview, setShowPreview] = useState(false); // Toggle preview section
   const [description, setDescription] = useState("");  // Survey description
   const [bgImage, setBgImage] = useState(null);        // Background image as base64
-
+  const [loading, setLoading] = useState(false);             //Loading state 
+  
+  
   // ── Row functions ──
 
   // Add a new row to the list
@@ -126,12 +129,74 @@ export default function AdminPage({ onSave, t }) {
 
   // ── Start survey validation ──
   // Validates required fields then sends data to App.js via onSave
-  const handleStart = () => {
+  //API-Integration: Handles the survey initialization process 
+  const handleStart = async () => {
     const newErrors = {};
     if (!surveyName.trim()) newErrors.surveyName = t.errorName;
     if (questions.length === 0) newErrors.questions = t.errorQuestions;
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
-    onSave(questions, surveyName, primaryColor, description, bgImage);
+    setLoading(true);
+
+    try {
+      //saves in 'projects' table
+
+      const { data: {user}, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Authorization failed")
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .insert([
+          { name: surveyName,
+            description: description, 
+            admin_id: user.id
+          },
+        ])
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+      //take generated id
+      const genProjectId = projectData.id;
+
+      //for each question, save in 'criteria' Table
+      for (const q of questions) {
+        const { data: criteriaData, error: criteriaError } = await supabase
+          .from('criteria')
+          .insert([
+            {
+            label: q.title,
+            project_id: genProjectId,
+            }
+          ])
+          .select()
+          .single();
+        
+        if (criteriaError) throw criteriaError;
+
+        //'alternatives' table: for each row of the question, save an alternative linked to the criteria
+        const alternativesArray = q.rows.map((rowName) => 
+          ({
+            name: rowName,
+            project_id: genProjectId,
+          }));
+
+        const { error : alternativesError } = await supabase
+          .from('alternatives')
+          .insert(alternativesArray);
+
+        if (alternativesError) throw alternativesError;
+      }
+
+
+      onSave(questions, surveyName, primaryColor, description, bgImage);
+
+    }
+      catch (error) {
+        console.error("Supabase insertion error", error);
+        alert("error detected" + error.message);
+      } finally {
+        setLoading(false);
+      }
+    
   };
 
   return (

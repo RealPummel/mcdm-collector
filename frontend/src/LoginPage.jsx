@@ -1,27 +1,41 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import { supabase } from "./supabaseClient";
 
 export default function LoginPage({ onLogin, t }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  const [loading, setLoading] = useState(false);
+
   // Temporary hardcoded login - later replace with Supabase auth
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    setError("");
+
     if (!email.trim() || !password.trim()) {
       setError("Please fill in all fields");
       return;
     }
-    if (email === "admin@ovgu.de" && password === "admin123") {
-      onLogin();
+
+    setLoading(true);
+
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    setLoading(false);
+
+    if (authError) {
+      setError(authError.message);
     } else {
-      setError("Invalid email or password");
+      onLogin();
     }
   };
 
   return (
     <div className="login-container">
       <div className="login-card">
-
         {/* Logo / Title */}
         <div className="login-header">
           <div className="login-logo">⬡</div>
@@ -35,18 +49,26 @@ export default function LoginPage({ onLogin, t }) {
           <input
             type="email"
             value={email}
-            onChange={e => { setEmail(e.target.value); setError(""); }}
+            disabled={loading}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError("");
+            }}
             placeholder="admin@ovgu.de"
-            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
           />
 
           <label>Password</label>
           <input
             type="password"
             value={password}
-            onChange={e => { setPassword(e.target.value); setError(""); }}
+            disabled={loading}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError("");
+            }}
             placeholder="••••••••"
-            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
           />
 
           {error && <p className="error-msg">{error}</p>}
@@ -54,15 +76,13 @@ export default function LoginPage({ onLogin, t }) {
           <button
             className="login-btn"
             onClick={handleLogin}
+            disabled={loading}
           >
-            Sign In →
+            {loading ? "Signing in..." : "Sign in →"}
           </button>
         </div>
 
-        <p className="login-hint">
-          Later this will be connected to Supabase auth
-        </p>
-
+        <p className="login-hint">MCDM</p>
       </div>
     </div>
   );

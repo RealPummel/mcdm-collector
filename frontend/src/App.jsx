@@ -1,122 +1,96 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState } from "react";
+import "./style.css";
+import AdminPage from "./AdminPage";
+import SurveyPage from "./SurveyPage";
+import LoginPage from "./LoginPage";
+import UsersPage from "./UsersPage";
+import { translations } from "./translations";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+// ── Language switcher outside of App to avoid hook issues ──
+function LangSwitcher({ lang, setLang }) {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    <div className="lang-switcher">
+      <button className={lang === "en" ? "lang-btn lang-btn-active" : "lang-btn"} onClick={() => setLang("en")}>EN</button>
+      <button className={lang === "de" ? "lang-btn lang-btn-active" : "lang-btn"} onClick={() => setLang("de")}>DE</button>
+    </div>
+  );
 }
 
-export default App
+export default function App() {
+  // ── All states at the top ──
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [questions, setQuestions] = useState(null);
+  const [surveyName, setSurveyName] = useState("");
+  const [primaryColor, setPrimaryColor] = useState("#7a003f");
+  const [description, setDescription] = useState("");
+  const [bgImage, setBgImage] = useState(null);
+  const [lang, setLang] = useState("en");
+  const [activePage, setActivePage] = useState("admin");
+
+  const t = translations[lang];
+
+  const handleSave = (q, name, color, desc, bg) => {
+    setQuestions(q);
+    setSurveyName(name);
+    setPrimaryColor(color);
+    setDescription(desc);
+    setBgImage(bg);
+  };
+
+  // ── Not logged in → show login page ──
+  if (!isLoggedIn) {
+    return (
+      <>
+        <LangSwitcher lang={lang} setLang={setLang} />
+        <LoginPage onLogin={() => setIsLoggedIn(true)} t={t} />
+      </>
+    );
+  }
+
+  // ── Survey view ──
+  if (questions) {
+    return (
+      <>
+        <LangSwitcher lang={lang} setLang={setLang} />
+        <SurveyPage
+          questions={questions}
+          surveyName={surveyName}
+          primaryColor={primaryColor}
+          description={description}
+          bgImage={bgImage}
+          onBack={() => setQuestions(null)}
+          t={t}
+        />
+      </>
+    );
+  }
+
+// ── Admin view ──
+return (
+  <>
+    <LangSwitcher lang={lang} setLang={setLang} />
+    <div className="top-bar">
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          className={activePage === "admin" ? "nav-tab nav-tab-active" : "nav-tab"}
+          onClick={() => setActivePage("admin")}
+        >
+          {t.surveysTab}
+        </button>
+        <button
+          className={activePage === "users" ? "nav-tab nav-tab-active" : "nav-tab"}
+          onClick={() => setActivePage("users")}
+        >
+          {t.usersTab}
+        </button>
+      </div>
+      <button className="signout-btn" onClick={() => setIsLoggedIn(false)}>
+        {t.signOut}
+      </button>
+    </div>
+
+    {activePage === "admin" && <AdminPage onSave={handleSave} t={t} />}
+    {activePage === "users" && <UsersPage t={t} />}
+  </>
+);
+}

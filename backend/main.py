@@ -1,47 +1,37 @@
-from typing import Annotated
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, Request, Query
+from typing import Optional, List
 from contextlib import asynccontextmanager
-from sqlmodel import Session, select
-from database import init_db, get_session
-from models import Project
+import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
+from .logic import *
+import json
 
+load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL")
+    SUPABASE_KEY: str = os.getenv("SUPABASE_KEY")
+    supabase_client: Client = create_client(supabase_url=SUPABASE_URL, supabase_key=SUPABASE_KEY)
+    app.state.supabase = supabase_client
     yield
-
-SessionDep = Annotated[Session, Depends(get_session)]
 
 app = FastAPI(lifespan=lifespan)
     
-@app.get("/")
-def root():
-    return {"Hello": "World"}
-
-@app.post("/projects/")
-def create_project(project: Project, session: SessionDep):
-    session.add(project)
-    session.commit()
-    session.refresh(project)
-    return project
-
-@app.get("/projects/", response_model=list[Project])
-def get_projects(
-    session: SessionDep, 
-    offset: int = 0, 
-    limit: int = Query(default=100, le=100)
-    ) -> list[Project]:
+@app.get("/projects/{project_id}/dashboard")
+async def get_dm_dashboard(
+    project_id: int,
+    request: Request,
+    metrics: Optional[List[str]] = Query(None)
+):
+    supabase: Client = request.app.state.supabase
     
-    projects = session.exec(select(Project).offset(offset).limit(limit)).all()
-    return projects
-
-@app.get("/projects/{project_id}")
-def get_project(project_id: int, session: SessionDep) -> Project:
-
-    pj = session.get(Project, project_id)
+    dashboard = {}
     
-    if not pj:
-        raise HTTPException(status_code=404, detail="Project not found")
+    if not metrics or "weight" in metrics:
+        dashboard.update({"weights": supabase.rpc("get_weight_values_by_project", {"p_id": project_id}).execute().data})
+    if not metrics or "user_score" in metrics:
+        dashboard.update({"user_scores": supabase.rpc("get_user_rating_by_project", {"p_id": project_id}).execute().data})
     
-    return pj
+    return dashboard

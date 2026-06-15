@@ -1,8 +1,8 @@
-import React, { useState } from "react";
-import { supabase } from "./supabaseClient";
+import React, { useState, useEffect } from "react";
 
-// ── Default scale labels (English) ──
-const defaultLabels = [
+// Default answer scale, pre-filled in the admin's current language. Once the
+// admin edits a label, their text is kept (it's survey content, not UI chrome).
+const defaultLabelsEN = [
   { value: 1, text: "1 - Very good" },
   { value: 2, text: "2 - Good" },
   { value: 3, text: "3 - Ok" },
@@ -10,7 +10,14 @@ const defaultLabels = [
   { value: 5, text: "5 - Very bad" },
 ];
 
-// ── Preset color options for the survey ──
+const defaultLabelsDE = [
+  { value: 1, text: "1 - Sehr gut" },
+  { value: 2, text: "2 - Gut" },
+  { value: 3, text: "3 - Okay" },
+  { value: 4, text: "4 - Schlecht" },
+  { value: 5, text: "5 - Sehr schlecht" },
+];
+
 const colorOptions = [
   { label: "OVGU Purple", value: "#7a003f" },
   { label: "Blue", value: "#1a73e8" },
@@ -19,74 +26,72 @@ const colorOptions = [
   { label: "Orange", value: "#e67e00" },
 ];
 
-// Main admin component - receives onSave and translation object t from App.js
 export default function AdminPage({ onSave, t }) {
+  // Detect language from an existing key (t.rows is "Zeilen" in German), so the
+  // scale and the new labels stay correct even before translations.js is updated.
+  const isGerman = t.rows === "Zeilen";
+  const defaultLabels = isGerman ? defaultLabelsDE : defaultLabelsEN;
 
-  // ── State variables ──
-  const [questions, setQuestions] = useState([]);       // All created questions
-  const [title, setTitle] = useState("");               // Current question title input
-  const [rows, setRows] = useState([]);                 // Current list of rows
-  const [rowInput, setRowInput] = useState("");         // Current row text input
-  const [surveyName, setSurveyName] = useState("");     // Survey name
-  const [labels, setLabels] = useState(defaultLabels); // Scale options
-  const [showScaleEditor, setShowScaleEditor] = useState(false); // Toggle scale editor
-  const [primaryColor, setPrimaryColor] = useState("#7a003f");   // Selected survey color
-  const [errors, setErrors] = useState({});            // Validation error messages
-  const [deleteConfirm, setDeleteConfirm] = useState(null);      // ID of question to delete
-  const [editingId, setEditingId] = useState(null);    // ID of question being edited
-  const [editTitle, setEditTitle] = useState("");       // Edited question title
-  const [showPreview, setShowPreview] = useState(false); // Toggle preview section
-  const [description, setDescription] = useState("");  // Survey description
-  const [bgImage, setBgImage] = useState(null);        // Background image as base64
-  const [loading, setLoading] = useState(false);             //Loading state 
-  
-  
-  // ── Row functions ──
+  const [questions, setQuestions] = useState([]);
+  const [title, setTitle] = useState("");
+  const [rows, setRows] = useState([]);
+  const [rowInput, setRowInput] = useState("");
+  const [surveyName, setSurveyName] = useState("");
+  const [labels, setLabels] = useState(defaultLabels);
+  const [showScaleEditor, setShowScaleEditor] = useState(false);
+  const [primaryColor, setPrimaryColor] = useState("#7a003f");
+  const [errors, setErrors] = useState({});
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
+  const [description, setDescription] = useState("");
+  const [bgImage, setBgImage] = useState(null);
 
-  // Add a new row to the list
   const addRow = () => {
     if (!rowInput.trim()) return;
     setRows([...rows, rowInput.trim()]);
     setRowInput("");
   };
 
-  // Remove a row by index
   const deleteRow = (index) => {
     setRows(rows.filter((_, i) => i !== index));
   };
 
-  // ── Question functions ──
+  // Clear the carried-over rows when the next question needs a different list.
+  const clearRows = () => {
+    setRows([]);
+    setRowInput("");
+  };
 
-  // Validate and save a new question
   const addQuestion = () => {
     const newErrors = {};
     if (!title.trim()) newErrors.title = t.errorTitle;
     if (rows.length === 0) newErrors.rows = t.errorRows;
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
-    setQuestions([...questions, { id: Date.now(), title, rows, labels: [...labels] }]);
-    setTitle(""); setRows([]); setRowInput("");
+    // Store a copy of rows so each question keeps its own list…
+    setQuestions([...questions, { id: Date.now(), title, rows: [...rows], labels: [...labels] }]);
+    // …and keep `rows` as-is so the next question inherits them. Only the
+    // title is cleared. Use "Clear rows" to start a fresh list.
+    setTitle("");
+    setRowInput("");
   };
 
-  // Show delete confirmation dialog
   const confirmDelete = (id) => setDeleteConfirm(id);
 
-  // Delete confirmed question
   const deleteQuestion = () => {
     setQuestions(questions.filter(q => q.id !== deleteConfirm));
     setDeleteConfirm(null);
   };
 
-  // Enter edit mode for a question
   const startEdit = (q) => { setEditingId(q.id); setEditTitle(q.title); };
 
-  // Save edited question title
   const saveEdit = (id) => {
     setQuestions(questions.map(q => q.id === id ? { ...q, title: editTitle } : q));
     setEditingId(null);
   };
 
-  // Move a question up or down in the list
   const moveQuestion = (index, direction) => {
     const newQuestions = [...questions];
     const target = index + direction;
@@ -95,30 +100,36 @@ export default function AdminPage({ onSave, t }) {
     setQuestions(newQuestions);
   };
 
-  // ── Scale functions ──
-
-  // Update text of a scale option
   const updateLabel = (index, newText) => {
     setLabels(labels.map((l, i) => i === index ? { ...l, text: newText } : l));
   };
 
-  // Add a new scale option at the end
   const addScaleOption = () => {
     const nextValue = labels.length + 1;
     setLabels([...labels, { value: nextValue, text: `${nextValue} - ` }]);
   };
 
-  // Remove a scale option (minimum 2 required)
   const removeScaleOption = (index) => {
     if (labels.length <= 2) return;
     setLabels(labels.filter((_, i) => i !== index).map((l, i) => ({ ...l, value: i + 1 })));
   };
 
-  // Reset scale to default
   const resetLabels = () => setLabels(defaultLabels);
 
-  // ── Image upload handler ──
-  // Converts uploaded image to base64 and stores it in state
+  // If the admin switches language while the scale is still untouched (equal to
+  // one of the default sets), swap it to the new language's default. A scale the
+  // admin has customized is left alone.
+  useEffect(() => {
+    const matchesDefault = (a, b) =>
+      a.length === b.length && a.every((l, i) => l.text === b[i].text);
+    setLabels((prev) =>
+      matchesDefault(prev, defaultLabelsEN) || matchesDefault(prev, defaultLabelsDE)
+        ? defaultLabels
+        : prev
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGerman]);
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -127,88 +138,34 @@ export default function AdminPage({ onSave, t }) {
     reader.readAsDataURL(file);
   };
 
-  // ── Start survey validation ──
-  // Validates required fields then sends data to App.js via onSave
-  //API-Integration: Handles the survey initialization process 
-  const handleStart = async () => {
+  const handleSave = () => {
     const newErrors = {};
     if (!surveyName.trim()) newErrors.surveyName = t.errorName;
     if (questions.length === 0) newErrors.questions = t.errorQuestions;
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
-    setLoading(true);
-
-    try {
-      //saves in 'projects' table
-
-      const { data: {user}, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error("Authorization failed")
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .insert([
-          { name: surveyName,
-            description: description, 
-            admin_id: user.id
-          },
-        ])
-        .select()
-        .single();
-
-      if (projectError) throw projectError;
-      //take generated id
-      const genProjectId = projectData.id;
-
-      //for each question, save in 'criteria' Table
-      for (const q of questions) {
-        const { data: criteriaData, error: criteriaError } = await supabase
-          .from('criteria')
-          .insert([
-            {
-            label: q.title,
-            project_id: genProjectId,
-            }
-          ])
-          .select()
-          .single();
-        
-        if (criteriaError) throw criteriaError;
-
-        //'alternatives' table: for each row of the question, save an alternative linked to the criteria
-        const alternativesArray = q.rows.map((rowName) => 
-          ({
-            name: rowName,
-            project_id: genProjectId,
-          }));
-
-        const { error : alternativesError } = await supabase
-          .from('alternatives')
-          .insert(alternativesArray);
-
-        if (alternativesError) throw alternativesError;
-      }
-
-
-      onSave(questions, surveyName, primaryColor, description, bgImage);
-
-    }
-      catch (error) {
-        console.error("Supabase insertion error", error);
-        alert("error detected" + error.message);
-      } finally {
-        setLoading(false);
-      }
-    
+    // Saves the survey and hands it back to App, which adds it to the
+    // dashboard (as a draft) and returns to the overview.
+    onSave(questions, surveyName, primaryColor, description, bgImage);
   };
+
+  // Language-correct fallbacks for the few new strings — used only until the
+  // matching keys live in translations.js.
+  const clearRowsLabel = t.clearRows || (isGerman ? "Zeilen leeren" : "Clear rows");
+  const rowsReusedLabel =
+    t.rowsReused ||
+    (isGerman
+      ? "Diese Zeilen werden für die nächste Frage übernommen — du kannst sie anpassen."
+      : "These rows carry over to the next question — you can adjust them.");
+  const saveLabel = t.saveSurvey || (isGerman ? "Umfrage speichern" : "Save survey");
 
   return (
     <div className="admin-container">
 
-      {/* ── Page title and subtitle ── */}
       <div className="admin-header">
         <h1>{t.adminTitle}</h1>
         <p>{t.adminSubtitle}</p>
       </div>
 
-      {/* ── Survey name and description inputs ── */}
       <div className="admin-card">
         <h2>{t.surveyName}</h2>
         <input value={surveyName} onChange={e => { setSurveyName(e.target.value); setErrors(p => ({ ...p, surveyName: null })); }} placeholder={t.surveyNamePlaceholder} />
@@ -217,7 +174,6 @@ export default function AdminPage({ onSave, t }) {
         <input value={description} onChange={e => setDescription(e.target.value)} placeholder={t.descriptionPlaceholder} />
       </div>
 
-      {/* ── Color picker: preset colors + custom color input ── */}
       <div className="admin-card">
         <h2>{t.surveyColor}</h2>
         <div className="color-options">
@@ -235,7 +191,6 @@ export default function AdminPage({ onSave, t }) {
       <div className="admin-card">
         <h2>{t.bgImage} <span className="hint">{t.bgImageHint}</span></h2>
 
-        {/* Hidden file input triggered by custom button */}
         <label htmlFor="bg-upload" className="upload-btn">
           📁 {t.chooseImage || "Choose Image"}
         </label>
@@ -247,35 +202,35 @@ export default function AdminPage({ onSave, t }) {
           style={{ display: "none" }}
         />
 
-        {/* Show preview if image selected, otherwise show placeholder text */}
         {bgImage ? (
           <div style={{ marginTop: 12, position: "relative" }}>
             <img src={bgImage} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 4 }} />
-            <button onClick={() => setBgImage(null)} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: 4, padding: "4px 8px", cursor: "pointer" }}>✕</button>
+            <button
+              onClick={() => setBgImage(null)}
+              style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: 4, padding: "4px 8px", cursor: "pointer" }}
+            >
+              ✕
+            </button>
           </div>
         ) : (
-          <p style={{ fontSize: 13, color: "#aaa", marginTop: 8 }}>{t.noImage || "No image selected"}</p>
+          <p style={{ fontSize: 13, color: "#aaa", marginTop: 8 }}>
+            {t.noImage || "No image selected"}
+          </p>
         )}
       </div>
 
-      {/* ── Scale editor: view or edit scale options ── */}
       <div className="admin-card">
         <div className="scale-header">
           <h2>{t.scale} <span className="count">{labels.length}</span></h2>
-          {/* Toggle between preview and edit mode */}
           <button className="toggle-btn" onClick={() => setShowScaleEditor(!showScaleEditor)}>
             {showScaleEditor ? t.scaleClose : t.scaleEdit}
           </button>
         </div>
-
-        {/* Preview mode: show scale as pills */}
         {!showScaleEditor && (
           <div className="scale-preview">
             {labels.map(l => <span key={l.value} className="scale-tag">{l.text}</span>)}
           </div>
         )}
-
-        {/* Edit mode: inputs to change each option */}
         {showScaleEditor && (
           <div>
             {labels.map((l, i) => (
@@ -292,51 +247,50 @@ export default function AdminPage({ onSave, t }) {
         )}
       </div>
 
-      {/* ── New question form ── */}
       <div className="admin-card">
         <h2>{t.newQuestion}</h2>
-
-        {/* Question title input */}
         <label>{t.questionTitle}</label>
         <input value={title} onChange={e => { setTitle(e.target.value); setErrors(p => ({ ...p, title: null })); }} placeholder={t.questionTitlePlaceholder} />
         {errors.title && <p className="error-msg">{errors.title}</p>}
 
-        {/* Row input: press Enter or + to add */}
-        <label>{t.rows}</label>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+          <label style={{ margin: 0 }}>{t.rows}</label>
+          {rows.length > 0 && (
+            <button className="toggle-btn" style={{ padding: "4px 10px" }} onClick={clearRows}>
+              {clearRowsLabel}
+            </button>
+          )}
+        </div>
         <div className="row-input-group">
           <input value={rowInput} onChange={e => setRowInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addRow()} placeholder={t.rowsPlaceholder} />
           <button className="add-row-btn" onClick={addRow}>+</button>
         </div>
         {errors.rows && <p className="error-msg">{errors.rows}</p>}
-
-        {/* List of added rows with delete button */}
         {rows.map((row, i) => (
           <div key={i} className="row-tag">
             <span>{row}</span>
             <button onClick={() => deleteRow(i)}>✕</button>
           </div>
         ))}
-
-        {/* Save question button */}
+        {rows.length > 0 && (
+          <p className="hint" style={{ marginTop: 8 }}>
+            {rowsReusedLabel}
+          </p>
+        )}
         <button className="admin-btn" onClick={addQuestion}>{t.addQuestion}</button>
       </div>
 
-      {/* ── List of all created questions ── */}
       {questions.length > 0 && (
         <div className="admin-card">
           <h2>{t.questionList} <span className="count">{questions.length}</span></h2>
           {errors.questions && <p className="error-msg">{errors.questions}</p>}
           {questions.map((q, i) => (
             <div key={q.id} className="question-item">
-
-              {/* Move up/down arrows */}
               <div className="move-btns">
                 <button onClick={() => moveQuestion(i, -1)} disabled={i === 0}>▲</button>
                 <button onClick={() => moveQuestion(i, 1)} disabled={i === questions.length - 1}>▼</button>
               </div>
-
               <div className="question-item-info">
-                {/* Edit mode: show input, otherwise show title */}
                 {editingId === q.id ? (
                   <div style={{ display: "flex", gap: 8 }}>
                     <input value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ padding: "4px 8px", fontSize: 14 }} />
@@ -345,22 +299,17 @@ export default function AdminPage({ onSave, t }) {
                 ) : (
                   <strong>{i + 1}. {q.title}</strong>
                 )}
-                {/* Row preview e.g. "KFC · Peter Pan · Sakura" */}
                 <span className="rows-preview">{q.rows.join(" · ")}</span>
               </div>
-
               <div style={{ display: "flex", gap: 6 }}>
-                {/* Edit and delete buttons */}
                 <button className="delete-btn" onClick={() => startEdit(q)}>✏️</button>
                 <button className="delete-btn" onClick={() => confirmDelete(q.id)}>{t.delete}</button>
               </div>
-
             </div>
           ))}
         </div>
       )}
 
-      {/* ── Delete confirmation dialog ── */}
       {deleteConfirm && (
         <div className="confirm-overlay">
           <div className="confirm-box">
@@ -373,21 +322,17 @@ export default function AdminPage({ onSave, t }) {
         </div>
       )}
 
-      {/* ── Preview and Start buttons ── */}
       {questions.length > 0 && (
         <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-          {/* Toggle preview section */}
           <button className="preview-btn" onClick={() => setShowPreview(!showPreview)}>
             {showPreview ? t.hidePreview : t.showPreview}
           </button>
-          {/* Start survey - sends all data to App.js */}
-          <button className="start-btn" style={{ background: primaryColor }} onClick={handleStart}>
-            {t.startSurvey}
+          <button className="start-btn" style={{ background: primaryColor }} onClick={handleSave}>
+            {saveLabel}
           </button>
         </div>
       )}
 
-      {/* ── Preview section: read-only matrix view ── */}
       {showPreview && (
         <div className="admin-card" style={{ marginTop: 12 }}>
           <h2>{t.preview}</h2>
@@ -408,7 +353,6 @@ export default function AdminPage({ onSave, t }) {
                       <td style={{ fontSize: 13, padding: 6 }}>{row}</td>
                       {q.labels.map(l => (
                         <td key={l.value} style={{ textAlign: "center", padding: 6 }}>
-                          {/* Disabled radio buttons for preview only */}
                           <input type="radio" disabled style={{ accentColor: primaryColor }} />
                         </td>
                       ))}

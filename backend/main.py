@@ -4,8 +4,7 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from .logic import *
-import json
+from .logic import calculate_weighted_sum
 
 load_dotenv()
 
@@ -20,33 +19,56 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
     
 @app.get("/projects/{project_id}/dashboard")
-async def get_dm_dashboard(
+async def get_project_dashboard(
     project_id: int,
     request: Request,
-    metrics: Optional[List[str]] = Query(None),
-    criterion_id: Optional[List[str]] = Query(None),
-    alternative_id: Optional[List[str]] = Query(None)
+    metrics: Optional[List[str]] = Query(None)
 ):
     supabase: Client = request.app.state.supabase
     
     dashboard = {}
     
-    if not metrics or "weight" in metrics:
-        dashboard.update({"weights": supabase.rpc("get_weight_values_by_project", {"p_id": project_id}).execute().data})
-        
-    if not metrics or "weight_avg" in metrics:
-        if criterion_id:
-            dashboard.update({"weight_avg": supabase.rpc("get_weight_avg_by_criterion", {"p_id": project_id, "c_id": criterion_id}).execute().data})
-        else:
-            dashboard.update({"weight_avg": supabase.rpc("get_weight_avg_by_project", {"p_id": project_id}).execute().data})
-        
-    if not metrics or "alternative_avg" in metrics:
-        if alternative_id:
-            dashboard.update({"alternative_score_avg": supabase.rpc("get_user_score_avg_by_alternative", {"p_id": project_id, "a_id": alternative_id}).execute().data})
-        else:
-            dashboard.update({"alternative_score_avg": supabase.rpc("get_user_score_avg_by_project", {"p_id": project_id}).execute().data})
-        
-    if not metrics or "user_score" in metrics:
-        dashboard.update({"user_scores": supabase.rpc("get_user_rating_by_project", {"p_id": project_id}).execute().data})
         
     return dashboard
+
+@app.get("/projects/{project_id}/weights")
+async def get_weights(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
+    return supabase.rpc("get_weight_values_by_project", {"p_id": project_id}).execute().data
+
+@app.get("/projects/{project_id}/weights/avg")
+async def get_weights_avg(project_id: int, request: Request, criterion_id: Optional[List[int]] = Query(None)):
+    supabase: Client = request.app.state.supabase
+    if criterion_id:
+        return {"weight_avg": supabase.rpc("get_weight_avg_by_criterion", {"p_id": project_id, "c_id": criterion_id}).execute().data}
+    
+    return {"weight_avg": supabase.rpc("get_weight_avg_by_project", {"p_id": project_id}).execute().data}
+    
+@app.get("/projects/{project_id}/alternatives/score/avg")
+async def get_alternative_avg_score(project_id: int, request: Request, alternative_id: Optional[List[int]] = Query(None)):
+    supabase: Client = request.app.state.supabase
+    if alternative_id:
+        return {"alternative_score_avg": supabase.rpc("get_user_score_avg_by_alternative", {"p_id": project_id, "a_id": alternative_id}).execute().data}
+    
+    return {"alternative_score_avg": supabase.rpc("get_user_score_avg_by_project", {"p_id": project_id}).execute().data}
+
+@app.get("/projects/{project_id}")
+async def get_user_scores(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
+    return {"user_scores": supabase.rpc("get_user_rating_by_project", {"p_id": project_id}).execute().data}
+
+@app.get("/projects/{project_id}/weighted_sum")
+async def get_weighted_sum(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
+    
+    weighted_sums = {}
+    data = supabase.rpc("get_dm_inputs", {"p_id": project_id}).execute().data
+    
+    for input in data.items():
+        dm_id = input[0]
+        dm_data = input[1]
+        weights = {int(k): v for k, v in (dm_data["weights"] or {}).items()}
+        ratings = dm_data["ratings"] or []
+        weighted_sums.update({dm_id: calculate_weighted_sum(weights, ratings)})
+    
+    return weighted_sums

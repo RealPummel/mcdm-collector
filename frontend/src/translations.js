@@ -39,6 +39,8 @@ export const translations = {
     errorQuestions: 'Please add at least one question',
     errorTitle: 'Please enter a question title',
     errorRows: 'Please add at least one row',
+    errorDuplicateQ: 'Question already in survey!', //added for duplicate questions
+    errorDuplicateRow: 'This option already exists in this question!',
     ownColor: 'Custom:',
 
     // Survey
@@ -137,6 +139,8 @@ export const translations = {
     errorQuestions: 'Bitte mindestens eine Frage hinzufügen',
     errorTitle: 'Bitte Fragetitel eingeben',
     errorRows: 'Bitte mindestens eine Zeile hinzufügen',
+    errorDuplicateQ: 'Diese Frage ist bereits in der Umfrage enthalten!',
+    errorDuplicateRow: 'Diese Option existiert bereits in dieser Frage!',
     ownColor: 'Eigene:',
 
     // Survey

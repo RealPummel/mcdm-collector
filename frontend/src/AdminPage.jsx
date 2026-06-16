@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { supabase } from "./supabaseClient";
 
 // Default answer scale, pre-filled in the admin's current language. Once the
 // admin edits a label, their text is kept (it's survey content, not UI chrome).
@@ -47,9 +48,20 @@ export default function AdminPage({ onSave, t }) {
   const [showPreview, setShowPreview] = useState(false);
   const [description, setDescription] = useState("");
   const [bgImage, setBgImage] = useState(null);
+  const [loading, setLoading] = useState(false);  //setlaoding state
 
   const addRow = () => {
-    if (!rowInput.trim()) return;
+    const trimmedInput = rowInput.trim();
+    
+    if (!trimmedInput) return;
+    
+    const isDuplicate = rows.some(r => r.toLowerCase() === trimmedInput.toLowerCase());
+    
+    if (isDuplicate) {
+      setErrors({ ...errors, rows: t.errorDuplicateRow });
+      return;
+    }
+    setErrors({});
     setRows([...rows, rowInput.trim()]);
     setRowInput("");
   };
@@ -69,6 +81,16 @@ export default function AdminPage({ onSave, t }) {
     if (!title.trim()) newErrors.title = t.errorTitle;
     if (rows.length === 0) newErrors.rows = t.errorRows;
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    
+    //check for duplicate quetsions
+    const isDuplicate = questions.some(q => q.title.trim().toLowerCase() === title.trim().toLowerCase());
+    if (isDuplicate) newErrors.title = t.errorDuplicateQ;
+
+    if (Object.keys(newErrors).length > 0) { 
+      setErrors(newErrors); 
+      return;
+    }
+    
     setErrors({});
     // Store a copy of rows so each question keeps its own list…
     setQuestions([...questions, { id: Date.now(), title, rows: [...rows], labels: [...labels] }]);
@@ -138,14 +160,63 @@ export default function AdminPage({ onSave, t }) {
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const newErrors = {};
     if (!surveyName.trim()) newErrors.surveyName = t.errorName;
     if (questions.length === 0) newErrors.questions = t.errorQuestions;
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
-    // Saves the survey and hands it back to App, which adds it to the
-    // dashboard (as a draft) and returns to the overview.
-    onSave(questions, surveyName, primaryColor, description, bgImage);
+    
+    setLoading(true);
+    try {
+      //saves in 'projects' table
+      const { data: {user}, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Authorization failed");
+      
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .insert([{ name: surveyName, description: description, admin_id: user.id }])
+        .select()
+        .single();
+      if (projectError) throw projectError;
+
+      const genProjectId = projectData.id; //take generated id
+
+      //for each question, save in 'criteria' Table, check for duplicates 
+
+      const uniqueQuestions = Array.from(
+        new Map(questions.map(q => [q.title, q])).values()
+      );
+
+      for (const q of uniqueQuestions) {
+        const { error: criteriaError } = await supabase
+          .from('criteria')
+          .insert([{ label: q.title, project_id: genProjectId }]);
+        if (criteriaError) throw criteriaError;
+      }
+
+      //'alternatives' table
+      const allAlternatives = questions.flatMap(q => q.rows);
+      const uniqueAlternatives = [...new Set(allAlternatives)].map(name => ({
+        name: name,
+        project_id: genProjectId
+      }));
+      
+      if (uniqueAlternatives.length > 0) {
+        const { error: alternativesError } = await supabase
+          .from('alternatives')
+          .insert(uniqueAlternatives);
+        if (alternativesError) throw alternativesError;
+      }
+
+      onSave(questions, surveyName, primaryColor, description, bgImage);
+    } 
+      catch (error) {
+        console.error("Supabase insertion error", error);
+        alert("error detected: " + error.message);
+      } finally {
+        setLoading(false);
+      }
+
   };
 
   // Language-correct fallbacks for the few new strings — used only until the

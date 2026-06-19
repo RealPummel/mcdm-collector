@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from .logic import calculate_weighted_sum
+from .logic import calculate_weighted_sum, calculate_score_range
 
 load_dotenv()
 
@@ -72,3 +72,17 @@ async def get_weighted_sum(project_id: int, request: Request):
         weighted_sums.update({dm_id: calculate_weighted_sum(weights, ratings)})
     
     return weighted_sums
+
+@app.get("/projects/{project_id}/score_range")
+async def get_score_range(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
+    
+    data = supabase.rpc("get_min_and_max_inputs_by_project", {"p_id": project_id}).execute().data
+    
+    weights = data["weights"]
+    ratings = data["ratings"]
+    
+    return calculate_score_range(
+        weights={int(crit_id): value for crit_id, value in weights.items()},
+        ratings=ratings
+    )

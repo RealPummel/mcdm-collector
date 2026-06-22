@@ -22,71 +22,71 @@ def calculate_weighted_sum(weights: Dict[int, float],
     
     return scores
 
-def calculate_average_alt_score(ratings: List[float]) -> float:
-    if not ratings:
-        return 0.0
+def calculate_score_range(weights: Dict[int, dict], # {criterion_id: {"min": x, "max": y}}
+                          ratings: Dict[int, dict]  # {alternative_id: {criterion_id: {"min": x, "max": y}}}
+) -> Dict:
+    results = {}
     
-    return sum(ratings) / len(ratings)
+    for alt_id, criteria in ratings.items():
         
-
-    
-def calculate_average_weight(weights: List[Dict[int, float]]) -> Dict[int, float]:
-    
-    sum_weights: Dict[int, float] = {}
-    
-    for user_weight_dict in weights:
-        for criterion_id, weight_val in user_weight_dict.items():
-            if criterion_id not in sum_weights:
-                sum_weights[criterion_id] = 0.0
+        # Calculate min and max possible scores
+        min_score = sum(
+            weights[int(crit_id)]["min"] * bounds["min"]
+            for crit_id, bounds in criteria.items()
+            if int(crit_id) in weights
+        )
+        
+        max_score = sum(
+            weights[int(crit_id)]["max"] * bounds["min"]
+            for crit_id, bounds in criteria.items()
+            if int(crit_id) in weights
+        )
+        
+        current_span = max_score - min_score
+        
+        # Calculate the reduction of the span if decision makers agree on criteria (via average value)
+        
+        criterion_impact = {}
+        for crit_id, bounds in criteria.items():
+            crit_id_int = int(crit_id)
+            if crit_id_int not in weights:
+                continue
             
-            sum_weights[criterion_id] += weight_val
-    
-    num_users = len(weights)
-    
-    if num_users == 0:
-        return {}
-    
-    average_weights: Dict[int, float] = {
-        criterion_id: round(total_sum / num_users, 2)
-        for criterion_id, total_sum in sum_weights.items()
-    }
-    
-    return average_weights
+            w = weights[crit_id_int]
+            avg_weight = (w["min"] + w["max"]) / 2
+            avg_rating = (bounds["min"] + bounds["max"]) / 2
+            
+            # Calculate new span if one criteria is set to average
+            
+            new_min = avg_weight * avg_rating + sum(
+                weights[int(crit)]["min"] * bound["min"]
+                for crit, bound in criteria.items()
+                if int(crit) != crit_id_int and int(crit) in weights
+            )
+            
+            new_max = avg_weight * avg_rating + sum(
+                weights[int(crit)]["max"] * bound["min"]
+                for crit, bound in criteria.items()
+                if int(crit) != crit_id_int and int(crit) in weights
+            )
+            
+            new_span = new_max - new_min
+            
+            reduction = current_span - new_span
+            
+            criterion_impact[crit_id_int] = {
+                "span_before": current_span,
+                "span_after": new_span,
+                "reduction": reduction
+            }
         
-
-def test_with_json():
-    input_json = {
-        "user_id": "12345",
-        "preferences": [
-            {"criterion_id": 1, "weight": 2.0},
-            {"criterion_id": 2, "weight": 4.0}
-        ],
-        "ratings": [
-            {"alternative_id": 10, "criterion_id": 1, "value": 9.0},
-            {"alternative_id": 10, "criterion_id": 2, "value": 4.0},
-            {"alternative_id": 12, "criterion_id": 1, "value": 5.0},
-            {"alternative_id": 12, "criterion_id": 2, "value": 8.0}
-        ]
-    }
-    
-    formatted_weights: Dict[int, float] = {
-        p["criterion_id"]: p["weight"] for p in input_json["preferences"]
-    }
-    
-    ratings_list = input_json["ratings"]
-    result_weighted_sum = calculate_weighted_sum(formatted_weights, ratings_list)
-    
-    print("Scores for alternatives:")
-    print(result_weighted_sum)
-    
-    mock_weights_from_multiple_users = [
-        {1: 2.0, 2: 4.0},  # User 1
-        {1: 4.0, 2: 2.0},  # User 2
-        {1: 3.0, 2: 3.0}   # User 3
-    ]
-    
-    result_average = calculate_average_weight(mock_weights_from_multiple_users)
-    
-    print(result_average)
+        sorted_impact = dict(sorted(criterion_impact.items(), key=lambda x: x[1]["reduction"], reverse=True))
         
-test_with_json()
+        results[alt_id] = {
+            "min_score": min_score,
+            "max_score": max_score,
+            "span": current_span,
+            "criterion_impact": sorted_impact
+        }
+        
+    return results

@@ -1,2 +1,7 @@
 .env
 backend/__pycache__/
+*.sql.dump
+*.backup
+supabase/.branches
+supabase/.temp
+supabase-project/volumes/

@@ -37,7 +37,7 @@ def calculate_score_range(weights: Dict[int, dict], # {criterion_id: {"min": x, 
         )
         
         max_score = sum(
-            weights[int(crit_id)]["max"] * bounds["min"]
+            weights[int(crit_id)]["max"] * bounds["max"]
             for crit_id, bounds in criteria.items()
             if int(crit_id) in weights
         )

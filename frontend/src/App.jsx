@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./style.css";
 import "./Dashboard.css";
 import AdminPage from "./AdminPage";
@@ -6,7 +6,9 @@ import SurveyPage from "./SurveyPage";
 import LoginPage from "./LoginPage";
 import UsersPage from "./UsersPage";
 import Dashboard from "./Dashboard";
+import RespondentPage from "./RespondentPage";
 import { translations } from "./translations";
+import { supabase } from "./supabaseClient";
 
 // ── Language switcher outside of App to avoid hook issues ──
 // DE first now, since German is the primary language.
@@ -34,63 +36,83 @@ const makeId = () =>
     ? crypto.randomUUID()
     : String(Date.now() + Math.random());
 
+// Check URL for respondent token — must be outside App to avoid re-renders
+const urlToken = new URLSearchParams(window.location.search).get("token");
+
 export default function App() {
+  const [lang, setLang] = useState("de");
+
+  // ── Respondent mode: show survey via token link ──
+  if (urlToken) {
+    return (
+      <>
+        <LangSwitcher lang={lang} setLang={setLang} />
+        <RespondentPage token={urlToken} t={translations[lang]} />
+      </>
+    );
+  }
+
   // ── All states at the top ──
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [lang, setLang] = useState("de"); // ← default is now German
   const [activePage, setActivePage] = useState("admin");
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
-  // All surveys live here now (was: a single survey in `questions`).
   const [surveys, setSurveys] = useState([]);
-
-  // editor: null = closed | { mode: "new" } | { mode: "edit", id }
   const [editor, setEditor] = useState(null);
-  // preview: a survey object to show in respondent view, or null
   const [preview, setPreview] = useState(null);
 
   const t = translations[lang];
 
-  // Called by AdminPage. Same positional signature as before, so the
-  // create flow works without changing AdminPage at all.
-  const handleSave = (questions, name, color, desc, bg) => {
-    setSurveys((prev) => {
-      if (editor?.mode === "edit") {
-        return prev.map((s) =>
-          s.id === editor.id
-            ? {
-                ...s,
-                questions,
-                name,
-                primaryColor: color,
-                description: desc,
-                bgImage: bg,
-                updatedAt: Date.now(),
-              }
-            : s
-        );
-      }
-      const now = Date.now();
-      return [
-        ...prev,
-        {
-          id: makeId(),
-          name,
-          description: desc,
-          primaryColor: color,
-          bgImage: bg,
-          questions,
-          status: "draft",
-          responses: 0,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ];
-    });
-    setEditor(null);
+  const loadSurveys = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const [{ data: projects }, { data: submitted }] = await Promise.all([
+      supabase
+        .from("projects")
+        .select("*, criteria(count)")
+        .eq("admin_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("decision_makers")
+        .select("project_id")
+        .eq("is_submitted", true),
+    ]);
+
+    if (!projects) return;
+
+    const submittedCount = (id) =>
+      (submitted || []).filter((d) => d.project_id === id).length;
+
+    setSurveys(
+      projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        primaryColor: "#7a003f",
+        bgImage: null,
+        questions: Array(p.criteria[0]?.count ?? 0).fill(null),
+        status: "draft",
+        responses: submittedCount(p.id),
+        createdAt: new Date(p.created_at).getTime(),
+        updatedAt: new Date(p.created_at).getTime(),
+      }))
+    );
   };
 
-  const handleDelete = (id) =>
+  useEffect(() => {
+    if (isLoggedIn) loadSurveys();
+  }, [isLoggedIn]);
+
+  const handleSave = (questions, name, color, desc, bg) => {
+    setEditor(null);
+    loadSurveys();
+  };
+
+  const handleDelete = async (id) => {
+    await supabase.from("projects").delete().eq("id", id);
     setSurveys((prev) => prev.filter((s) => s.id !== id));
+  };
 
   const handleDuplicate = (id) =>
     setSurveys((prev) => {
@@ -180,11 +202,39 @@ export default function App() {
           >
             {t.usersTab}
           </button>
+          <button className="signout-btn" onClick={() => setShowSignOutConfirm(true)}>
+            {t.signOut}
+          </button>
         </div>
-        <button className="signout-btn" onClick={() => setIsLoggedIn(false)}>
-          {t.signOut}
-        </button>
       </div>
+
+      {showSignOutConfirm && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>{t.confirmSignOut}</p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+              <button
+                className="admin-btn"
+                style={{ margin: 0 }}
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  setShowSignOutConfirm(false);
+                  setIsLoggedIn(false);
+                }}
+              >
+                {t.yes}
+              </button>
+              <button
+                className="admin-btn"
+                style={{ margin: 0, background: "#888" }}
+                onClick={() => setShowSignOutConfirm(false)}
+              >
+                {t.no}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activePage === "admin" && (
         <Dashboard

@@ -27,6 +27,9 @@ const colorOptions = [
   { label: "Orange", value: "#e67e00" },
 ];
 
+// ── NEU: Standard-Höchstzahl für die Gewichts-Sterne ──
+const DEFAULT_WEIGHT_MAX = 5;
+
 export default function AdminPage({ onSave, t }) {
   // Detect language from an existing key (t.rows is "Zeilen" in German), so the
   // scale and the new labels stay correct even before translations.js is updated.
@@ -47,16 +50,18 @@ export default function AdminPage({ onSave, t }) {
   const [editTitle, setEditTitle] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [description, setDescription] = useState("");
-  const [bgImage, setBgImage] = useState(null);
   const [loading, setLoading] = useState(false);  //setlaoding state
+
+  // ── NEU: Anzahl Sterne (Gewichts-Skala) für die nächste Frage ──
+  const [weightMax, setWeightMax] = useState(DEFAULT_WEIGHT_MAX);
 
   const addRow = () => {
     const trimmedInput = rowInput.trim();
-    
+
     if (!trimmedInput) return;
-    
+
     const isDuplicate = rows.some(r => r.toLowerCase() === trimmedInput.toLowerCase());
-    
+
     if (isDuplicate) {
       setErrors({ ...errors, rows: t.errorDuplicateRow });
       return;
@@ -81,19 +86,20 @@ export default function AdminPage({ onSave, t }) {
     if (!title.trim()) newErrors.title = t.errorTitle;
     if (rows.length === 0) newErrors.rows = t.errorRows;
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
-    
+
     //check for duplicate quetsions
     const isDuplicate = questions.some(q => q.title.trim().toLowerCase() === title.trim().toLowerCase());
     if (isDuplicate) newErrors.title = t.errorDuplicateQ;
 
-    if (Object.keys(newErrors).length > 0) { 
-      setErrors(newErrors); 
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
-    
+
     setErrors({});
     // Store a copy of rows so each question keeps its own list…
-    setQuestions([...questions, { id: Date.now(), title, rows: [...rows], labels: [...labels] }]);
+    // ── NEU: weightScaleMax pro Frage mitspeichern ──
+    setQuestions([...questions, { id: Date.now(), title, rows: [...rows], labels: [...labels], weightScaleMax: weightMax }]);
     // …and keep `rows` as-is so the next question inherits them. Only the
     // title is cleared. Use "Clear rows" to start a fresh list.
     setTitle("");
@@ -112,6 +118,12 @@ export default function AdminPage({ onSave, t }) {
   const saveEdit = (id) => {
     setQuestions(questions.map(q => q.id === id ? { ...q, title: editTitle } : q));
     setEditingId(null);
+  };
+
+  // ── NEU: Sternzahl einer bereits angelegten Frage ändern ──
+  const updateQuestionWeightMax = (id, value) => {
+    const n = Math.max(2, Math.min(10, parseInt(value) || DEFAULT_WEIGHT_MAX));
+    setQuestions(questions.map(q => q.id === id ? { ...q, weightScaleMax: n } : q));
   };
 
   const moveQuestion = (index, direction) => {
@@ -152,26 +164,18 @@ export default function AdminPage({ onSave, t }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGerman]);
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setBgImage(reader.result);
-    reader.readAsDataURL(file);
-  };
-
   const handleSave = async () => {
     const newErrors = {};
     if (!surveyName.trim()) newErrors.surveyName = t.errorName;
     if (questions.length === 0) newErrors.questions = t.errorQuestions;
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
-    
+
     setLoading(true);
     try {
       //saves in 'projects' table
       const { data: {user}, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error("Authorization failed");
-      
+
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .insert([{ name: surveyName, description: description, admin_id: user.id }])
@@ -181,13 +185,16 @@ export default function AdminPage({ onSave, t }) {
 
       const genProjectId = projectData.id; //take generated id
 
-      //for each question, save in 'criteria' Table, check for duplicates 
+      //for each question, save in 'criteria' Table, check for duplicates
 
       const uniqueQuestions = Array.from(
         new Map(questions.map(q => [q.title, q])).values()
       );
 
       for (const q of uniqueQuestions) {
+        // ── NEU: weightScaleMax steht hier pro Frage bereit (q.weightScaleMax) ──
+        // Wenn die Supabase-Spalte existiert, hier mitspeichern, z. B.:
+        //   .insert([{ label: q.title, project_id: genProjectId, weight_scale_max: q.weightScaleMax }])
         const { error: criteriaError } = await supabase
           .from('criteria')
           .insert([{ label: q.title, project_id: genProjectId }]);
@@ -200,7 +207,7 @@ export default function AdminPage({ onSave, t }) {
         name: name,
         project_id: genProjectId
       }));
-      
+
       if (uniqueAlternatives.length > 0) {
         const { error: alternativesError } = await supabase
           .from('alternatives')
@@ -208,8 +215,8 @@ export default function AdminPage({ onSave, t }) {
         if (alternativesError) throw alternativesError;
       }
 
-      onSave(questions, surveyName, primaryColor, description, bgImage);
-    } 
+      onSave(questions, surveyName, primaryColor, description, null);
+    }
       catch (error) {
         console.error("Supabase insertion error", error);
         alert("error detected: " + error.message);
@@ -228,6 +235,9 @@ export default function AdminPage({ onSave, t }) {
       ? "Diese Zeilen werden für die nächste Frage übernommen — du kannst sie anpassen."
       : "These rows carry over to the next question — you can adjust them.");
   const saveLabel = t.saveSurvey || (isGerman ? "Umfrage speichern" : "Save survey");
+  // ── NEU: Texte für die Gewichts-Skala ──
+  const weightMaxLabel = t.weightMaxLabel || (isGerman ? "Anzahl Sterne (Gewichtung)" : "Number of stars (weighting)");
+  const weightMaxHint = t.weightMaxHint || (isGerman ? "So viele Sterne sieht der/die Befragte für diese Frage." : "The respondent sees this many stars for this question.");
 
   return (
     <div className="admin-container">
@@ -241,7 +251,7 @@ export default function AdminPage({ onSave, t }) {
         <h2>{t.surveyName}</h2>
         <input value={surveyName} onChange={e => { setSurveyName(e.target.value); setErrors(p => ({ ...p, surveyName: null })); }} placeholder={t.surveyNamePlaceholder} />
         {errors.surveyName && <p className="error-msg">{errors.surveyName}</p>}
-        <label style={{ marginTop: 16 }}>{t.description} <span className="hint">{t.bgImageHint}</span></label>
+        <label style={{ marginTop: 16 }}>{t.description}</label>
         <input value={description} onChange={e => setDescription(e.target.value)} placeholder={t.descriptionPlaceholder} />
       </div>
 
@@ -256,38 +266,6 @@ export default function AdminPage({ onSave, t }) {
             <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} style={{ width: 40, height: 36, padding: 2, border: "1px solid #ddd", borderRadius: 4, cursor: "pointer" }} />
           </div>
         </div>
-      </div>
-
-      {/* ── Background image upload ── */}
-      <div className="admin-card">
-        <h2>{t.bgImage} <span className="hint">{t.bgImageHint}</span></h2>
-
-        <label htmlFor="bg-upload" className="upload-btn">
-          📁 {t.chooseImage || "Choose Image"}
-        </label>
-        <input
-          id="bg-upload"
-          type="file"
-          accept="image/*"
-          onChange={handleImageUpload}
-          style={{ display: "none" }}
-        />
-
-        {bgImage ? (
-          <div style={{ marginTop: 12, position: "relative" }}>
-            <img src={bgImage} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 4 }} />
-            <button
-              onClick={() => setBgImage(null)}
-              style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: 4, padding: "4px 8px", cursor: "pointer" }}
-            >
-              ✕
-            </button>
-          </div>
-        ) : (
-          <p style={{ fontSize: 13, color: "#aaa", marginTop: 8 }}>
-            {t.noImage || "No image selected"}
-          </p>
-        )}
       </div>
 
       <div className="admin-card">
@@ -323,6 +301,23 @@ export default function AdminPage({ onSave, t }) {
         <label>{t.questionTitle}</label>
         <input value={title} onChange={e => { setTitle(e.target.value); setErrors(p => ({ ...p, title: null })); }} placeholder={t.questionTitlePlaceholder} />
         {errors.title && <p className="error-msg">{errors.title}</p>}
+
+        {/* ── NEU: Anzahl Sterne (Gewichts-Skala) für diese Frage ── */}
+        <label style={{ marginTop: 12 }}>{weightMaxLabel}</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <input
+            type="number"
+            min={2}
+            max={10}
+            value={weightMax}
+            onChange={e => setWeightMax(Math.max(2, Math.min(10, parseInt(e.target.value) || DEFAULT_WEIGHT_MAX)))}
+            style={{ width: 90 }}
+          />
+          <span style={{ color: "#7a003f", fontSize: 18, letterSpacing: 2 }}>
+            {"★".repeat(weightMax)}
+          </span>
+        </div>
+        <p className="hint" style={{ marginTop: 4 }}>{weightMaxHint}</p>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
           <label style={{ margin: 0 }}>{t.rows}</label>
@@ -371,6 +366,19 @@ export default function AdminPage({ onSave, t }) {
                   <strong>{i + 1}. {q.title}</strong>
                 )}
                 <span className="rows-preview">{q.rows.join(" · ")}</span>
+                {/* ── NEU: Sternzahl pro Frage anzeigen + anpassbar ── */}
+                <span className="rows-preview" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: "#7a003f" }}>{"★".repeat(q.weightScaleMax || DEFAULT_WEIGHT_MAX)}</span>
+                  <input
+                    type="number"
+                    min={2}
+                    max={10}
+                    value={q.weightScaleMax || DEFAULT_WEIGHT_MAX}
+                    onChange={e => updateQuestionWeightMax(q.id, e.target.value)}
+                    style={{ width: 56, padding: "2px 6px", fontSize: 13 }}
+                    title={weightMaxLabel}
+                  />
+                </span>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 <button className="delete-btn" onClick={() => startEdit(q)}>✏️</button>
@@ -410,6 +418,13 @@ export default function AdminPage({ onSave, t }) {
           {questions.map((q, i) => (
             <div key={q.id} style={{ marginBottom: 16, borderBottom: "1px solid #f0f0f0", paddingBottom: 16 }}>
               <strong style={{ color: primaryColor }}>{i + 1}. {q.title}</strong>
+              {/* ── NEU: Gewichts-Sterne in der Vorschau anzeigen ── */}
+              <p style={{ fontSize: 13, color: "#888", margin: "6px 0" }}>
+                {isGerman ? "Gewichtung: " : "Weighting: "}
+                <span style={{ color: primaryColor, fontSize: 16, letterSpacing: 2 }}>
+                  {"★".repeat(q.weightScaleMax || DEFAULT_WEIGHT_MAX)}
+                </span>
+              </p>
               <p style={{ fontSize: 12, color: "#888", margin: "4px 0 8px" }}>{q.labels.map(l => l.text).join(" | ")}</p>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>

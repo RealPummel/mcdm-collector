@@ -7,11 +7,11 @@ import LoginPage from "./LoginPage";
 import UsersPage from "./UsersPage";
 import Dashboard from "./Dashboard";
 import RespondentPage from "./RespondentPage";
+import Analytics from "./Analytics";
 import { translations } from "./translations";
 import { supabase } from "./supabaseClient";
 
 // ── Language switcher outside of App to avoid hook issues ──
-// DE first now, since German is the primary language.
 function LangSwitcher({ lang, setLang }) {
   return (
     <div className="lang-switcher">
@@ -40,19 +40,8 @@ const makeId = () =>
 const urlToken = new URLSearchParams(window.location.search).get("token");
 
 export default function App() {
+  // ── ALLE Hooks zuerst, ohne return dazwischen ──
   const [lang, setLang] = useState("de");
-
-  // ── Respondent mode: show survey via token link ──
-  if (urlToken) {
-    return (
-      <>
-        <LangSwitcher lang={lang} setLang={setLang} />
-        <RespondentPage token={urlToken} t={translations[lang]} />
-      </>
-    );
-  }
-
-  // ── All states at the top ──
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activePage, setActivePage] = useState("admin");
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
@@ -138,6 +127,16 @@ export default function App() {
       prev.map((s) => (s.id === id ? { ...s, status, updatedAt: Date.now() } : s))
     );
 
+  // ── Respondent mode: show survey via token link (nach den Hooks!) ──
+  if (urlToken) {
+    return (
+      <>
+        <LangSwitcher lang={lang} setLang={setLang} />
+        <RespondentPage token={urlToken} t={translations[lang]} />
+      </>
+    );
+  }
+
   // ── Not logged in → show login page ──
   if (!isLoggedIn) {
     return (
@@ -178,13 +177,12 @@ export default function App() {
             ← {t.backToDashboard}
           </button>
         </div>
-        {/* initialSurvey lets AdminPage prefill when editing (see note below) */}
         <AdminPage onSave={handleSave} t={t} initialSurvey={initialSurvey} />
       </>
     );
   }
 
-  // ── Logged-in shell: Dashboard + Users ──
+  // ── Logged-in shell: Dashboard + Users + Analytics ──
   return (
     <>
       <LangSwitcher lang={lang} setLang={setLang} />
@@ -195,6 +193,12 @@ export default function App() {
             onClick={() => setActivePage("admin")}
           >
             {t.surveysTab}
+          </button>
+          <button
+            className={activePage === "analytics" ? "nav-tab nav-tab-active" : "nav-tab"}
+            onClick={() => setActivePage("analytics")}
+          >
+            {t.analyticsTab || "Auswertung"}
           </button>
           <button
             className={activePage === "users" ? "nav-tab nav-tab-active" : "nav-tab"}
@@ -249,6 +253,7 @@ export default function App() {
           onSetStatus={handleSetStatus}
         />
       )}
+      {activePage === "analytics" && <Analytics surveys={surveys} t={t} />}
       {activePage === "users" && <UsersPage t={t} />}
     </>
   );

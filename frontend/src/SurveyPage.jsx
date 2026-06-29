@@ -1,8 +1,51 @@
 import React, { useState } from "react";
 
+// Anklickbare Sterne-Skala. `max` bestimmt, wie viele Sterne erscheinen.
+function StarRating({ value, onChange, max = 5, color = "#7a003f" }) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Gewichtung"
+      style={{ display: "flex", gap: 6, marginTop: 8 }}
+    >
+      {Array.from({ length: max }, (_, i) => i + 1).map((star) => {
+        const active = star <= (hover || value);
+        return (
+          <button
+            key={star}
+            type="button"
+            role="radio"
+            aria-checked={value === star}
+            aria-label={`${star} ${star === 1 ? "Stern" : "Sterne"}`}
+            onClick={() => onChange(star)}
+            onMouseEnter={() => setHover(star)}
+            onMouseLeave={() => setHover(0)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 30,
+              lineHeight: 1,
+              padding: 0,
+              color: active ? color : "#d8d3da",
+              transition: "color 0.12s, transform 0.12s",
+              transform: active ? "scale(1.05)" : "scale(1)",
+            }}
+          >
+            ★
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function SurveyPage({ questions, surveyName, primaryColor, description, bgImage, onBack, t }) {
 
   const [answers, setAnswers] = useState({});
+  // Gewichte pro Frage (in der Vorschau anklickbar)
+  const [weights, setWeights] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -13,13 +56,22 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
     }));
   };
 
+  const handleWeight = (questionId, value) => {
+    setWeights(prev => ({ ...prev, [questionId]: value }));
+  };
+
   const handleSubmit = () => {
-    console.log(answers);
+    console.log("answers:", answers);
+    console.log("weights:", weights);
     setSubmitted(true);
   };
 
   const currentQuestion = questions[currentIndex];
   const progress = Math.round(((currentIndex + 1) / questions.length) * 100);
+
+  // Anzahl Sterne aus der Frage; Standard 5, falls nicht gesetzt
+  const starMax = currentQuestion?.weightScaleMax || 5;
+  const currentWeight = weights[currentQuestion?.id] || 0;
 
   if (submitted) {
     return (
@@ -68,6 +120,33 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
         </div>
       </div>
 
+      {/* Gewichtungsfrage mit Sternen (Anzahl je Frage) */}
+      <div className="question-card">
+        <h2>{t.weightQuestion || "Wie wichtig ist dir dieser Punkt?"}</h2>
+        <p style={{ color: "#555", fontSize: 14, margin: "0 0 4px" }}>
+          {t.weightIntro ||
+            "Wähle, wie wichtig dir dieser Punkt bei deiner Entscheidung ist. Klicke auf die Sterne — 1 Stern bedeutet wenig wichtig, mehr Sterne bedeuten sehr wichtig."}
+        </p>
+        <p className="legend" style={{ fontWeight: "bold", color: primaryColor }}>{currentQuestion.title}</p>
+        <StarRating
+          value={currentWeight}
+          onChange={(v) => handleWeight(currentQuestion.id, v)}
+          max={starMax}
+          color={primaryColor}
+        />
+        {/* Beschriftung an den Enden der Skala */}
+        <div style={{ display: "flex", justifyContent: "space-between", maxWidth: starMax * 36, marginTop: 4 }}>
+          <span style={{ fontSize: 12, color: "#999" }}>{t.weightLow || "weniger wichtig"}</span>
+          <span style={{ fontSize: 12, color: "#999" }}>{t.weightHigh || "sehr wichtig"}</span>
+        </div>
+        <p className="legend" style={{ marginTop: 8 }}>
+          {currentWeight
+            ? `${t.weightChosen || "Deine Wahl"}: ${currentWeight} / ${starMax}`
+            : (t.weightHint || "Bitte wähle eine Gewichtung, indem du auf die Sterne klickst.")}
+        </p>
+      </div>
+
+      {/* Bewertung der Alternativen (wie bisher) */}
       <div className="question-card">
         <h2>{currentQuestion.title}</h2>
         <p className="legend">

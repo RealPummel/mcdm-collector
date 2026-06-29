@@ -43,6 +43,16 @@ export const translations = {
     errorDuplicateRow: 'This option already exists in this question!',
     ownColor: 'Custom:',
 
+    // Weighting (stars)
+    weightMaxLabel: 'Number of stars (weighting)',
+    weightMaxHint: 'The respondent sees this many stars for this question.',
+    weightQuestion: 'How important is this to you?',
+    weightIntro: 'Choose how important this point is for your decision. Click the stars — 1 star means not important, more stars mean very important.',
+    weightLow: 'less important',
+    weightHigh: 'very important',
+    weightChosen: 'Your choice',
+    weightHint: 'Please choose a weighting by clicking the stars.',
+
     // Survey
     back: '← Back to Admin',
     questionOf: 'of',
@@ -122,6 +132,23 @@ export const translations = {
     sortOldest: 'Oldest first',
     sortNameAsc: 'Name A–Z',
     sortNameDesc: 'Name Z–A',
+
+    // Analytics / Evaluation
+    analyticsTab: 'Analytics',
+    analyticsTitle: 'Analytics',
+    analyticsSubtitle: 'View and filter the survey results.',
+    analyticsSelectSurvey: 'Survey',
+    metricRanking: 'Ranking of alternatives',
+    metricCriteria: 'Avg. rating per criterion',
+    metricWeights: 'Weighting of criteria',
+    chartBar: 'Bars',
+    chartPie: 'Pie',
+    chartTable: 'Table',
+    kpiResponses: 'Responses',
+    kpiCompletion: 'Completion rate',
+    kpiTop: 'Top alternative',
+    placeholderNote: 'Sample data – will be replaced by real results later.',
+    noDataForSurvey: 'No data for this survey.',
   },
 
   de: {
@@ -167,6 +194,16 @@ export const translations = {
     errorDuplicateQ: 'Diese Frage ist bereits in der Umfrage enthalten!',
     errorDuplicateRow: 'Diese Option existiert bereits in dieser Frage!',
     ownColor: 'Eigene:',
+
+    // Gewichtung (Sterne)
+    weightMaxLabel: 'Anzahl Sterne (Gewichtung)',
+    weightMaxHint: 'So viele Sterne sieht der/die Befragte für diese Frage.',
+    weightQuestion: 'Wie wichtig ist dir dieser Punkt?',
+    weightIntro: 'Wähle, wie wichtig dir dieser Punkt bei deiner Entscheidung ist. Klicke auf die Sterne — 1 Stern bedeutet wenig wichtig, mehr Sterne bedeuten sehr wichtig.',
+    weightLow: 'weniger wichtig',
+    weightHigh: 'sehr wichtig',
+    weightChosen: 'Deine Wahl',
+    weightHint: 'Bitte wähle eine Gewichtung, indem du auf die Sterne klickst.',
 
     // Survey
     back: '← Zurück zur Admin-Seite',
@@ -247,5 +284,22 @@ export const translations = {
     sortOldest: 'Älteste zuerst',
     sortNameAsc: 'Name A–Z',
     sortNameDesc: 'Name Z–A',
+
+    // Analytics / Auswertung
+    analyticsTab: 'Auswertung',
+    analyticsTitle: 'Auswertung',
+    analyticsSubtitle: 'Ergebnisse der Umfrage ansehen und filtern.',
+    analyticsSelectSurvey: 'Umfrage',
+    metricRanking: 'Ranking der Alternativen',
+    metricCriteria: 'Ø-Bewertung pro Kriterium',
+    metricWeights: 'Gewichtung der Kriterien',
+    chartBar: 'Balken',
+    chartPie: 'Torte',
+    chartTable: 'Tabelle',
+    kpiResponses: 'Antworten',
+    kpiCompletion: 'Abschlussrate',
+    kpiTop: 'Top-Alternative',
+    placeholderNote: 'Beispieldaten – werden später durch echte Auswertung ersetzt.',
+    noDataForSurvey: 'Keine Daten für diese Umfrage.',
   },
 };

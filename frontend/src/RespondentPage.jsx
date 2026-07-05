@@ -9,6 +9,7 @@ export default function RespondentPage({ token, t }) {
   const [alternatives, setAlternatives] = useState([]);
 
   const [answers, setAnswers] = useState({});
+  const [weights, setWeights] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -55,6 +56,10 @@ export default function RespondentPage({ token, t }) {
     }));
   };
 
+  const handleWeightSelect = (criterionId, value) => {
+    setWeights((prev) => ({ ...prev, [criterionId]: value }));
+  };
+
   const handleSubmit = async () => {
     setSaving(true);
     try {
@@ -75,6 +80,19 @@ export default function RespondentPage({ token, t }) {
           .from("criterion_ratings")
           .insert(ratings);
         if (ratingsError) throw ratingsError;
+      }
+
+      const weightRows = Object.entries(weights).map(([criterionId, value]) => ({
+        dm_id: dm.id,
+        criterion_id: parseInt(criterionId),
+        value: parseFloat(value),
+      }));
+
+      if (weightRows.length > 0) {
+        const { error: weightsError } = await supabase
+          .from("criterion_weights")
+          .insert(weightRows);
+        if (weightsError) throw weightsError;
       }
 
       const { error: updateError } = await supabase
@@ -147,6 +165,11 @@ export default function RespondentPage({ token, t }) {
   const progress = Math.round(((currentIndex + 1) / criteria.length) * 100);
   const scale = [1, 2, 3, 4, 5];
 
+  const hasWeight = !!weights[currentCriterion?.id];
+  const hasAllRatings = alternatives.length > 0 &&
+    alternatives.every((alt) => answers[currentCriterion?.id]?.[alt.id] !== undefined);
+  const canProceed = hasWeight && hasAllRatings;
+
   return (
     <div className="survey-container">
 
@@ -165,6 +188,46 @@ export default function RespondentPage({ token, t }) {
         <div className="progress-bar">
           <div className="progress-fill" style={{ width: `${progress}%`, background: "#7a003f" }} />
         </div>
+      </div>
+
+      <div className="question-card">
+        <h2>{t.weightQuestion}</h2>
+        <p style={{ color: "#555", fontSize: 14, margin: "0 0 4px" }}>
+          {t.weightIntro}
+        </p>
+        <p className="legend" style={{ fontWeight: "bold", color: "#7a003f" }}>{currentCriterion?.label}</p>
+        <div role="radiogroup" aria-label={t.weightQuestion} style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          {scale.map((star) => {
+            const currentWeight = weights[currentCriterion?.id] || 0;
+            const active = star <= currentWeight;
+            return (
+              <button
+                key={star}
+                type="button"
+                role="radio"
+                aria-checked={currentWeight === star}
+                aria-label={`${star} star${star === 1 ? "" : "s"}`}
+                onClick={() => handleWeightSelect(currentCriterion.id, star)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 30,
+                  lineHeight: 1,
+                  padding: 0,
+                  color: active ? "#7a003f" : "#d8d3da",
+                }}
+              >
+                ★
+              </button>
+            );
+          })}
+        </div>
+        <p className="legend" style={{ marginTop: 8 }}>
+          {weights[currentCriterion?.id]
+            ? `${t.weightChosen}: ${weights[currentCriterion.id]} / 5`
+            : t.weightHint}
+        </p>
       </div>
 
       <div className="question-card">
@@ -207,17 +270,18 @@ export default function RespondentPage({ token, t }) {
         {currentIndex < criteria.length - 1 ? (
           <button
             className="submit-btn"
-            style={{ background: "#7a003f" }}
+            style={{ background: canProceed ? "#7a003f" : "#ccc" }}
             onClick={() => setCurrentIndex(currentIndex + 1)}
+            disabled={!canProceed}
           >
             {t.next}
           </button>
         ) : (
           <button
             className="submit-btn"
-            style={{ background: "#7a003f" }}
+            style={{ background: (saving || !canProceed) ? "#ccc" : "#7a003f" }}
             onClick={handleSubmit}
-            disabled={saving}
+            disabled={saving || !canProceed}
           >
             {saving ? t.saving : t.submit}
           </button>

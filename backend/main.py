@@ -1,47 +1,88 @@
-from typing import Annotated
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, Request, Query
+from typing import Optional, List
 from contextlib import asynccontextmanager
-from sqlmodel import Session, select
-from database import init_db, get_session
-from models import Project
+import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
+from .logic import calculate_weighted_sum, calculate_score_range
 
+load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL")
+    SUPABASE_KEY: str = os.getenv("SUPABASE_KEY")
+    supabase_client: Client = create_client(supabase_url=SUPABASE_URL, supabase_key=SUPABASE_KEY)
+    app.state.supabase = supabase_client
     yield
-
-SessionDep = Annotated[Session, Depends(get_session)]
 
 app = FastAPI(lifespan=lifespan)
     
-@app.get("/")
-def root():
-    return {"Hello": "World"}
-
-@app.post("/projects/")
-def create_project(project: Project, session: SessionDep):
-    session.add(project)
-    session.commit()
-    session.refresh(project)
-    return project
-
-@app.get("/projects/", response_model=list[Project])
-def get_projects(
-    session: SessionDep, 
-    offset: int = 0, 
-    limit: int = Query(default=100, le=100)
-    ) -> list[Project]:
+@app.get("/projects/{project_id}/dashboard")
+async def get_project_dashboard(
+    project_id: int,
+    request: Request,
+    metrics: Optional[List[str]] = Query(None)
+):
+    supabase: Client = request.app.state.supabase
     
-    projects = session.exec(select(Project).offset(offset).limit(limit)).all()
-    return projects
+    dashboard = {}
+    
+        
+    return dashboard
+
+@app.get("/projects/{project_id}/weights")
+async def get_weights(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
+    return supabase.rpc("get_weight_values_by_project", {"p_id": project_id}).execute().data
+
+@app.get("/projects/{project_id}/weights/avg")
+async def get_weights_avg(project_id: int, request: Request, criterion_id: Optional[List[int]] = Query(None)):
+    supabase: Client = request.app.state.supabase
+    if criterion_id:
+        return {"weight_avg": supabase.rpc("get_weight_avg_by_criterion", {"p_id": project_id, "c_id": criterion_id}).execute().data}
+    
+    return {"weight_avg": supabase.rpc("get_weight_avg_by_project", {"p_id": project_id}).execute().data}
+    
+@app.get("/projects/{project_id}/alternatives/score/avg")
+async def get_alternative_avg_score(project_id: int, request: Request, alternative_id: Optional[List[int]] = Query(None)):
+    supabase: Client = request.app.state.supabase
+    if alternative_id:
+        return {"alternative_score_avg": supabase.rpc("get_user_score_avg_by_alternative", {"p_id": project_id, "a_id": alternative_id}).execute().data}
+    
+    return {"alternative_score_avg": supabase.rpc("get_user_score_avg_by_project", {"p_id": project_id}).execute().data}
 
 @app.get("/projects/{project_id}")
-def get_project(project_id: int, session: SessionDep) -> Project:
+async def get_user_scores(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
+    return {"user_scores": supabase.rpc("get_user_rating_by_project", {"p_id": project_id}).execute().data}
 
-    pj = session.get(Project, project_id)
+@app.get("/projects/{project_id}/weighted_sum")
+async def get_weighted_sum(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
     
-    if not pj:
-        raise HTTPException(status_code=404, detail="Project not found")
+    weighted_sums = {}
+    data = supabase.rpc("get_dm_inputs", {"p_id": project_id}).execute().data
     
-    return pj
+    for input in data.items():
+        dm_id = input[0]
+        dm_data = input[1]
+        weights = {int(k): v for k, v in (dm_data["weights"] or {}).items()}
+        ratings = dm_data["ratings"] or []
+        weighted_sums.update({dm_id: calculate_weighted_sum(weights, ratings)})
+    
+    return weighted_sums
+
+@app.get("/projects/{project_id}/score_range")
+async def get_score_range(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
+    
+    data = supabase.rpc("get_min_and_max_inputs_by_project", {"p_id": project_id}).execute().data
+    
+    weights = data["weights"]
+    ratings = data["ratings"]
+    
+    return calculate_score_range(
+        weights={int(crit_id): value for crit_id, value in weights.items()},
+        ratings=ratings
+    )

@@ -192,12 +192,9 @@ export default function AdminPage({ onSave, t }) {
       );
 
       for (const q of uniqueQuestions) {
-        // ── NEU: weightScaleMax steht hier pro Frage bereit (q.weightScaleMax) ──
-        // Wenn die Supabase-Spalte existiert, hier mitspeichern, z. B.:
-        //   .insert([{ label: q.title, project_id: genProjectId, weight_scale_max: q.weightScaleMax }])
         const { error: criteriaError } = await supabase
           .from('criteria')
-          .insert([{ label: q.title, project_id: genProjectId }]);
+          .insert([{ label: q.title, project_id: genProjectId, max_value: q.weightScaleMax || DEFAULT_WEIGHT_MAX }]);
         if (criteriaError) throw criteriaError;
       }
 

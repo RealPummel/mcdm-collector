@@ -164,6 +164,8 @@ export default function RespondentPage({ token, t }) {
   const currentCriterion = criteria[currentIndex];
   const progress = Math.round(((currentIndex + 1) / criteria.length) * 100);
   const scale = [1, 2, 3, 4, 5];
+  const weightMax = currentCriterion?.max_value || 5;
+  const weightScale = Array.from({ length: weightMax }, (_, i) => i + 1);
 
   const hasWeight = !!weights[currentCriterion?.id];
   const hasAllRatings = alternatives.length > 0 &&
@@ -196,36 +198,41 @@ export default function RespondentPage({ token, t }) {
           {t.weightIntro}
         </p>
         <p className="legend" style={{ fontWeight: "bold", color: "#7a003f" }}>{currentCriterion?.label}</p>
-        <div role="radiogroup" aria-label={t.weightQuestion} style={{ display: "flex", gap: 6, marginTop: 8 }}>
-          {scale.map((star) => {
-            const currentWeight = weights[currentCriterion?.id] || 0;
-            const active = star <= currentWeight;
-            return (
-              <button
-                key={star}
-                type="button"
-                role="radio"
-                aria-checked={currentWeight === star}
-                aria-label={`${star} star${star === 1 ? "" : "s"}`}
-                onClick={() => handleWeightSelect(currentCriterion.id, star)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 30,
-                  lineHeight: 1,
-                  padding: 0,
-                  color: active ? "#7a003f" : "#d8d3da",
-                }}
-              >
-                ★
-              </button>
-            );
-          })}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+          <div role="radiogroup" aria-label={t.weightQuestion} style={{ display: "flex", gap: 6 }}>
+            {weightScale.map((star) => {
+              const currentWeight = weights[currentCriterion?.id] || 0;
+              const active = star <= currentWeight;
+              return (
+                <button
+                  key={star}
+                  type="button"
+                  role="radio"
+                  aria-checked={currentWeight === star}
+                  aria-label={`${star} star${star === 1 ? "" : "s"}`}
+                  onClick={() => handleWeightSelect(currentCriterion.id, star)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 30,
+                    lineHeight: 1,
+                    padding: 0,
+                    color: active ? "#7a003f" : "#d8d3da",
+                  }}
+                >
+                  ★
+                </button>
+              );
+            })}
+          </div>
+          <span style={{ fontWeight: "bold", color: "#7a003f", fontSize: 14 }}>
+            {weights[currentCriterion?.id] || 0} / {weightMax}
+          </span>
         </div>
         <p className="legend" style={{ marginTop: 8 }}>
           {weights[currentCriterion?.id]
-            ? `${t.weightChosen}: ${weights[currentCriterion.id]} / 5`
+            ? `${t.weightChosen}: ${weights[currentCriterion.id]} / ${weightMax}`
             : t.weightHint}
         </p>
       </div>

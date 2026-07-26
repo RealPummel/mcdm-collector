@@ -21,24 +21,23 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Your frontend URL
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-    
-@app.get("/projects/{project_id}/dashboard")
-async def get_project_dashboard(
-    project_id: int,
-    request: Request,
-    metrics: Optional[List[str]] = Query(None)
-):
+
+@app.get("/projects/{project_id}/alternatives")
+async def get_alternatives(project_id: int, request: Request):
     supabase: Client = request.app.state.supabase
-    
-    dashboard = {}
-    
-        
-    return dashboard
+    data = supabase.table("alternatives").select("id, name").eq("project_id", project_id).execute().data
+    return {str(row["id"]): row["name"] for row in data}
+
+@app.get("/projects/{project_id}/criteria")
+async def get_criteria(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
+    data = supabase.table("criteria").select("id, label").eq("project_id", project_id).execute().data
+    return {str(row["id"]): row["label"] for row in data}
 
 @app.get("/projects/{project_id}/weights")
 async def get_weights(project_id: int, request: Request):
@@ -80,7 +79,7 @@ async def get_weighted_sum(project_id: int, request: Request):
         ratings = dm_data["ratings"] or []
         weighted_sums.update({dm_id: calculate_weighted_sum(weights, ratings)})
     
-    return weighted_sums
+    return {"weighted_sums": weighted_sums}
 
 @app.get("/projects/{project_id}/score_range")
 async def get_score_range(project_id: int, request: Request):

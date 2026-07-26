@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "./supabaseClient";
+// import { supabase } from "./supabaseClient"; // für Frontend-Test deaktiviert
 
 // Default answer scale, pre-filled in the admin's current language. Once the
 // admin edits a label, their text is kept (it's survey content, not UI chrome).
@@ -170,60 +170,26 @@ export default function AdminPage({ onSave, t }) {
     if (questions.length === 0) newErrors.questions = t.errorQuestions;
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
+    // ── FRONTEND-TESTVERSION: kein Supabase. Daten nur in der Konsole. ──
+    // Das Team baut hier später das echte Speichern (siehe Original-AdminPage) wieder ein.
     setLoading(true);
     try {
-      //saves in 'projects' table
-      const { data: {user}, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error("Authorization failed");
-
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .insert([{ name: surveyName, description: description, admin_id: user.id }])
-        .select()
-        .single();
-      if (projectError) throw projectError;
-
-      const genProjectId = projectData.id; //take generated id
-
-      //for each question, save in 'criteria' Table, check for duplicates
-
-      const uniqueQuestions = Array.from(
-        new Map(questions.map(q => [q.title, q])).values()
-      );
-
-      for (const q of uniqueQuestions) {
-        // ── NEU: weightScaleMax steht hier pro Frage bereit (q.weightScaleMax) ──
-        // Wenn die Supabase-Spalte existiert, hier mitspeichern, z. B.:
-        //   .insert([{ label: q.title, project_id: genProjectId, weight_scale_max: q.weightScaleMax }])
-        const { error: criteriaError } = await supabase
-          .from('criteria')
-          .insert([{ label: q.title, project_id: genProjectId }]);
-        if (criteriaError) throw criteriaError;
-      }
-
-      //'alternatives' table
-      const allAlternatives = questions.flatMap(q => q.rows);
-      const uniqueAlternatives = [...new Set(allAlternatives)].map(name => ({
-        name: name,
-        project_id: genProjectId
-      }));
-
-      if (uniqueAlternatives.length > 0) {
-        const { error: alternativesError } = await supabase
-          .from('alternatives')
-          .insert(uniqueAlternatives);
-        if (alternativesError) throw alternativesError;
-      }
-
+      console.log("=== Umfrage (Test, nicht gespeichert) ===");
+      console.log("surveyName:", surveyName);
+      console.log("description:", description);
+      console.log("primaryColor:", primaryColor);
+      console.log("questions (inkl. weightScaleMax pro Frage):", questions);
+      questions.forEach((q, i) => {
+        console.log(`Frage ${i + 1}: "${q.title}" -> ${q.weightScaleMax || 5} Sterne, Alternativen: ${q.rows.join(", ")}`);
+      });
+      alert("Test-Modus: Umfrage wurde NICHT in der Datenbank gespeichert.\nDie Daten stehen in der Browser-Konsole (F12).");
       onSave(questions, surveyName, primaryColor, description, null);
+    } catch (error) {
+      console.error("Fehler im Test-Modus:", error);
+      alert("Fehler: " + error.message);
+    } finally {
+      setLoading(false);
     }
-      catch (error) {
-        console.error("Supabase insertion error", error);
-        alert("error detected: " + error.message);
-      } finally {
-        setLoading(false);
-      }
-
   };
 
   // Language-correct fallbacks for the few new strings — used only until the

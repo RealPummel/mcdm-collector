@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from .logic import calculate_weighted_sum, calculate_score_range
+from logic import calculate_weighted_sum, calculate_score_range
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
@@ -17,6 +18,14 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
     
 @app.get("/projects/{project_id}/dashboard")
 async def get_project_dashboard(

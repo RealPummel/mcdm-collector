@@ -70,8 +70,8 @@ async def get_weighted_sum(project_id: int, request: Request):
     supabase: Client = request.app.state.supabase
     
     weighted_sums = {}
-    data = supabase.rpc("get_dm_inputs", {"p_id": project_id}).execute().data
-    
+    data = supabase.rpc("get_dm_inputs", {"p_id": project_id}).execute().data or {}
+
     for input in data.items():
         dm_id = input[0]
         dm_data = input[1]
@@ -85,10 +85,10 @@ async def get_weighted_sum(project_id: int, request: Request):
 async def get_score_range(project_id: int, request: Request):
     supabase: Client = request.app.state.supabase
     
-    data = supabase.rpc("get_min_and_max_inputs_by_project", {"p_id": project_id}).execute().data
-    
-    weights = data["weights"]
-    ratings = data["ratings"]
+    data = supabase.rpc("get_min_and_max_inputs_by_project", {"p_id": project_id}).execute().data or {}
+
+    weights = data.get("weights") or {}
+    ratings = data.get("ratings") or {}
     
     return calculate_score_range(
         weights={int(crit_id): value for crit_id, value in weights.items()},

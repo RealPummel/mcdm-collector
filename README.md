@@ -59,30 +59,27 @@ cd mcdm-collector
 
 ### 2. Configure environment variables
 
+Backend:
+
 ```bash
 cp .env.example .env
-# Fill in your Supabase connection details (see Environment Variables below)
+# Fill in your Supabase credentials (see Environment Variables below)
 ```
 
-### 3. Start the backend
+Frontend:
 
 ```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-fastapi dev main.py
+cp frontend/.env.example frontend/.env
+# Fill in your Supabase credentials (see Environment Variables below)
 ```
 
-### 4. Start the frontend
+### 3. Start backend and frontend
 
 ```bash
-cd frontend
-npm install
-npm run dev
+docker compose up --build
 ```
 
-The frontend will be available at **http://localhost:5173**.
+The frontend will be available at **http://localhost:5173** and the backend at **http://localhost:8000**.
 
 ---
 

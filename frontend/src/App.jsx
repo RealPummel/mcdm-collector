@@ -4,6 +4,7 @@ import "./Dashboard.css";
 import AdminPage from "./AdminPage";
 import SurveyPage from "./SurveyPage";
 import LoginPage from "./LoginPage";
+import RegisterPage from "./RegisterPage";
 import UsersPage from "./UsersPage";
 import Dashboard from "./Dashboard";
 import RespondentPage from "./RespondentPage";
@@ -39,12 +40,21 @@ const makeId = () =>
 // Check URL for respondent token — must be outside App to avoid re-renders
 const urlToken = new URLSearchParams(window.location.search).get("token");
 
+// Erkennen, ob die Seite über einen Einladungs-/Registrierungs-Link geöffnet wurde.
+// Supabase hängt die Invite-Infos ins URL-Fragment (z. B. #access_token=...&type=invite).
+const urlHash = typeof window !== "undefined" ? window.location.hash || "" : "";
+const isInviteLink =
+  urlHash.includes("type=invite") ||
+  urlHash.includes("type=recovery") ||
+  new URLSearchParams(window.location.search).get("register") === "1";
+
 export default function App() {
   // ── ALLE Hooks zuerst, ohne return dazwischen ──
   const [lang, setLang] = useState("de");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activePage, setActivePage] = useState("admin");
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [showRegister, setShowRegister] = useState(isInviteLink);
 
   const [surveys, setSurveys] = useState([]);
   const [editor, setEditor] = useState(null);
@@ -137,12 +147,33 @@ export default function App() {
     );
   }
 
+  // ── Registrierung: eingeladene Admins setzen ihr Passwort ──
+  if (showRegister && !isLoggedIn) {
+    return (
+      <>
+        <LangSwitcher lang={lang} setLang={setLang} />
+        <RegisterPage
+          t={t}
+          onRegistered={() => {
+            setShowRegister(false);
+            setIsLoggedIn(true);
+          }}
+          onBackToLogin={() => setShowRegister(false)}
+        />
+      </>
+    );
+  }
+
   // ── Not logged in → show login page ──
   if (!isLoggedIn) {
     return (
       <>
         <LangSwitcher lang={lang} setLang={setLang} />
-        <LoginPage onLogin={() => setIsLoggedIn(true)} t={t} />
+        <LoginPage
+          onLogin={() => setIsLoggedIn(true)}
+          onShowRegister={() => setShowRegister(true)}
+          t={t}
+        />
       </>
     );
   }

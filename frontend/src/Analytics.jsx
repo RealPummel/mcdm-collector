@@ -3,7 +3,6 @@ import React, { useMemo, useState, useEffect } from "react";
 // ────────────────────────────────────────────────────────────
 // Analytics / Auswertung fürs Dashboard
 //
-// ECHTE DATEN vom FastAPI Backend!
 // Endpoints:
 //   - GET /projects/{project_id}/ → responses
 //   - GET /projects/{project_id}/weighted_sum → ranking scores
@@ -34,15 +33,8 @@ const EMPTY_RESULT = {
 
 function EmptyHint({ text }) {
   return (
-    <p
-      style={{
-        textAlign: "center",
-        color: "#aaa",
-        fontSize: 14,
-        padding: "24px 0",
-      }}
-    >
-      {text || "Keine Daten fuer diese Umfrage."}
+    <p style={{ textAlign: "center", color: "#aaa", fontSize: 14, padding: "24px 0" }}>
+      {text}
     </p>
   );
 }
@@ -171,35 +163,112 @@ function PieChart({ data, emptyText }) {
   );
 }
 
+// Rohdaten-Tabelle (Fragen als Zeilen, Gewichtung als Spalte 2, Alternativen als Spalten)
+function RawDataTable({ data, criteriaList, emptyText, questionLabel, weightLabel }) {
+  if (!data || data.length === 0) return <EmptyHint text={emptyText} />;
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr style={{ background: "#f9f9f9" }}>
+            <th style={{ textAlign: "left", padding: "8px 6px", borderBottom: "2px solid #eee", minWidth: 100, fontWeight: "bold" }}>
+              {questionLabel}
+            </th>
+            {/* Gewichtungen Spalte (als 2. Spalte) */}
+            <th
+              style={{
+                textAlign: "center",
+                padding: "8px 6px",
+                borderBottom: "2px solid #eee",
+                color: "#7a003f",
+                fontWeight: "bold",
+                background: "#f0ecf0",
+                minWidth: 140
+              }}
+            >
+              {weightLabel}
+            </th>
+            {/* Jede Alternative ist eine Spalte */}
+            {data.map((alt) => (
+              <th
+                key={alt.alternative}
+                style={{
+                  textAlign: "center",
+                  padding: "8px 6px",
+                  borderBottom: "2px solid #eee",
+                  color: "#666",
+                  fontWeight: "bold",
+                  minWidth: 140
+                }}
+              >
+                {alt.alternative}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {criteriaList.map((crit, idx) => (
+            <tr key={crit} style={{ borderBottom: "1px solid #f3f3f3" }}>
+              {/* Frage-Name */}
+              <td style={{ padding: "8px 6px", fontWeight: "bold", background: "#f9f9f9" }}>
+                {crit}
+              </td>
+
+              {/* Gewichtungen für dieses Kriterium (als 2. Spalte) */}
+              <td
+                style={{
+                  padding: "8px 6px",
+                  textAlign: "center",
+                  fontFamily: "monospace",
+                  color: "#7a003f",
+                  fontSize: 11,
+                  background: "#f0ecf0",
+                  fontWeight: "bold"
+                }}
+              >
+                {data[0] && data[0][crit.toLowerCase()] ?
+                  "{" + data[0][crit.toLowerCase()].weights.join(",") + "}"
+                  : "-"
+                }
+              </td>
+
+              {/* Jede Alternative ist eine Spalte */}
+              {data.map((alt) => {
+                const critData = alt[crit.toLowerCase()];
+                const values = critData?.values || [];
+                return (
+                  <td
+                    key={`${crit}-${alt.alternative}`}
+                    style={{
+                      padding: "8px 6px",
+                      textAlign: "center",
+                      fontFamily: "monospace",
+                      color: "#7a003f",
+                      fontSize: 11
+                    }}
+                  >
+                    {"{" + values.join(",") + "}"}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // Tabelle
-function DataTable({ data, valueLabel, unit = "", emptyText }) {
+function DataTable({ data, valueLabel, unit = "", emptyText, nameLabel }) {
   if (!data.length) return <EmptyHint text={emptyText} />;
   return (
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
         <tr>
-          <th
-            style={{
-              textAlign: "left",
-              fontSize: 13,
-              color: "#666",
-              padding: "8px 6px",
-              borderBottom: "2px solid #eee",
-            }}
-          >
-            Name
-          </th>
-          <th
-            style={{
-              textAlign: "right",
-              fontSize: 13,
-              color: "#666",
-              padding: "8px 6px",
-              borderBottom: "2px solid #eee",
-            }}
-          >
-            {valueLabel}
-          </th>
+          <th style={{ textAlign: "left", fontSize: 13, color: "#666", padding: "8px 6px", borderBottom: "2px solid #eee" }}>{nameLabel}</th>
+          <th style={{ textAlign: "right", fontSize: 13, color: "#666", padding: "8px 6px", borderBottom: "2px solid #eee" }}>{valueLabel}</th>
         </tr>
       </thead>
       <tbody>
@@ -235,28 +304,79 @@ function DataTable({ data, valueLabel, unit = "", emptyText }) {
 }
 
 // Loading-Spinner
-function LoadingSpinner() {
+function LoadingSpinner({ text }) {
   return (
     <div style={{ textAlign: "center", padding: "24px", color: "#999" }}>
-      <p>Daten werden geladen...</p>
+      <p>{text}</p>
     </div>
   );
 }
 
+// CSV Export für Rohdaten (Fragen als Zeilen, Gewichtung als Spalte 2, Alternativen als Spalten)
+function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
+  if (!rawData || rawData.length === 0) {
+    alert(tx.noRawDataAlert);
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const filename = `${surveyName.replace(/\s+/g, '_')}_rawdata_${today}.csv`;
+
+  // Semikolon als Spaltentrenner, damit die Kommas in {4,5,3,4} nicht
+  // mit den Spalten kollidieren (deutsches Excel erwartet ohnehin ";").
+  const SEP = ";";
+
+  let csvContent = "";
+
+  // Header Row: Frage | Gewichtung | Alternative A | Alternative B | ...
+  const headers = [tx.colQuestion, tx.colWeight, ...rawData.map(alt => alt.alternative)];
+  csvContent += headers.join(SEP) + "\n";
+
+  // Data Rows (eine Zeile pro Frage/Kriterium)
+  criteria.forEach(crit => {
+    const row = [crit];
+
+    // Gewichtungen für dieses Kriterium (2. Spalte)
+    const weights = rawData[0]?.[crit.toLowerCase()]?.weights || [];
+    row.push(`{${weights.join(",")}}`);
+
+    // Für jede Alternative die Bewertungen
+    rawData.forEach(alt => {
+      const critData = alt[crit.toLowerCase()];
+      const values = critData?.values || [];
+      row.push(`{${values.join(",")}}`);
+    });
+
+    csvContent += row.join(SEP) + "\n";
+  });
+
+  const BOM = "\uFEFF";
+  const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 // Error-Meldung
-function ErrorMessage({ message }) {
+function ErrorMessage({ message, prefix }) {
   return (
-    <div
-      style={{
-        background: "#fee",
-        border: "1px solid #fcc",
-        borderRadius: 8,
-        padding: "12px 16px",
-        color: "#c33",
-        fontSize: 13,
-      }}
-    >
-      ❌ Fehler beim Laden der Daten: {message}
+    <div style={{
+      background: "#fee",
+      border: "1px solid #fcc",
+      borderRadius: 8,
+      padding: "12px 16px",
+      color: "#c33",
+      fontSize: 13
+    }}>
+      {prefix} {message}
     </div>
   );
 }
@@ -265,96 +385,84 @@ function ErrorMessage({ message }) {
 // ║  Funktion um Daten vom Backend zu laden                          ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
+// Hilfsfunktion: holt einen Wert egal ob das Feld "value", "rating" oder "score" heißt
+function pickValue(obj) {
+  if (obj == null) return null;
+  if (typeof obj === "number") return obj;
+  return obj.value ?? obj.rating ?? obj.score ?? obj.weight ?? null;
+}
+
 async function fetchProjectResults(projectId) {
   try {
-    // Parallel alle 5 API-Calls machen
+    // Alle nötigen Endpoints parallel abrufen
     const [
-      responsesData,
-      weightedSumData,
-      scoresAvgData,
-      weightsAvgData,
-      scoreRangeData,
-      alternativeNames,
-      criterionNames,
+      userScoresData,   // { user_scores: [ {alternative_id, criterion_id, value, user_id?} ] }
+      weightsData,      // [ {criterion_id, value, user_id?} ]  (Rohgewichte pro Person)
+      alternativesMap,  // { "5": "Restaurant A", ... }
+      criteriaMap,      // { "2": "Essen", ... }
+      weightedSumData,  // { weighted_sums: { dm_id: { alt_id: score } } }
+      scoresAvgData,    // { alternative_score_avg: { crit_id: value } }
+      weightsAvgData,   // { weight_avg: { crit_id: value } }
     ] = await Promise.all([
-      fetch(`${API_BASE_URL}/projects/${projectId}`).then((r) => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/weighted_sum`).then((r) =>
-        r.json(),
-      ),
-      fetch(
-        `${API_BASE_URL}/projects/${projectId}/alternatives/score/avg`,
-      ).then((r) => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/weights/avg`).then((r) =>
-        r.json(),
-      ),
-      fetch(`${API_BASE_URL}/projects/${projectId}/score_range`).then((r) =>
-        r.json(),
-      ),
-      fetch(`${API_BASE_URL}/projects/${projectId}/alternatives`).then((r) =>
-        r.json(),
-      ),
-      fetch(`${API_BASE_URL}/projects/${projectId}/criteria`).then((r) =>
-        r.json(),
-      ),
+      fetch(`${API_BASE_URL}/projects/${projectId}`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/projects/${projectId}/weights`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/projects/${projectId}/alternatives`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/projects/${projectId}/criteria`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/projects/${projectId}/weighted_sum`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/projects/${projectId}/alternatives/score/avg`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/projects/${projectId}/weights/avg`).then(r => r.json()),
     ]);
 
-    // Responses zählen
-    const responses = responsesData?.user_scores?.length || 0;
+    // Namen-Lookups (mit Fallback auf ID falls kein Name da ist)
+    const altName = (id) => (alternativesMap && alternativesMap[String(id)]) || `Alternative ${id}`;
+    const critName = (id) => (criteriaMap && criteriaMap[String(id)]) || `Criterion ${id}`;
 
-    // Berechne Abschlussrate (Beispiel: basierend auf Responses)
-    const completionRate =
-      responses > 0
-        ? Math.round((responses / Math.max(responses, 1)) * 100)
-        : 0;
+    const userScores = userScoresData?.user_scores || [];
+    const rawWeights = Array.isArray(weightsData) ? weightsData : (weightsData?.weights || []);
 
-    const scoresByAlternative = {};
-
-    Object.entries(weightedSumData?.weighted_sums || {}).forEach(
-      ([dmId, alternatives]) => {
-        Object.entries(alternatives).forEach(([altId, score]) => {
-          if (!scoresByAlternative[altId]) {
-            scoresByAlternative[altId] = [];
-          }
-          scoresByAlternative[altId].push(score);
-        });
-      },
+    // ── Anzahl Antworten (eindeutige Personen, falls user_id vorhanden) ──
+    const uniqueUsers = new Set(
+      userScores.map(s => s.user_id ?? s.dm_id ?? s.decision_maker_id).filter(v => v != null)
     );
+    const responses = uniqueUsers.size || userScores.length;
+    const completionRate = 0; // Backend liefert (noch) keine Abschlussrate
 
-    // Ranking aus weighted_sum transformieren
-    const ranking = Object.entries(scoresByAlternative)
-      .map(([altId, scores]) => ({
-        alternative_id: altId,
-        name: alternativeNames?.[altId] || `Alternative ${altId}`,
-        score: Math.round(
-          scores.reduce((sum, s) => sum + s, 0) / scores.length,
-        ),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
+    // ── Ranking aus weighted_sum ──
+    // Scores über alle Entscheider pro Alternative aufsummieren
+    const scoreByAlt = {};
+    Object.values(weightedSumData?.weighted_sums || {}).forEach(alternatives => {
+      Object.entries(alternatives || {}).forEach(([altId, score]) => {
+        scoreByAlt[altId] = (scoreByAlt[altId] || 0) + Number(score || 0);
+      });
+    });
+    const ranking = Object.entries(scoreByAlt)
+      .map(([altId, score]) => ({ name: altName(altId), score: Math.round(score) }))
+      .sort((a, b) => b.score - a.score);
 
-    // Criteria Average aus scores_avg transformieren
-    const criteriaAvg = Object.entries(
-      scoresAvgData?.alternative_score_avg || {},
-    )
-      .map(([altId, value]) => ({
-        name: alternativeNames?.[altId] || `Alternative ${altId}`,
-        value: Math.round(value * 10) / 10,
-      }))
-      .sort((a, b) => b.value - a.value);
-
-    // Weights aus weights_avg transformieren
-    const weightsTotal =
-      Object.values(weightsAvgData?.weight_avg || {}).reduce(
-        (sum, val) => sum + val,
-        0,
-      ) || 1;
-
-    const weights = Object.entries(weightsAvgData?.weight_avg || {})
+    // ── Ø-Bewertung pro Kriterium ──
+    const criteriaAvg = Object.entries(scoresAvgData?.alternative_score_avg || {})
       .map(([critId, value]) => ({
-        name: criterionNames?.[critId] || `Kriterium ${critId}`,
-        value: Math.round((value / weightsTotal) * 100),
+        name: critName(critId),
+        value: Math.round(Number(value) * 10) / 10,
       }))
       .sort((a, b) => b.value - a.value);
+
+    // ── Gewichtung der Kriterien (Durchschnitt, in %) ──
+    const weightAvgObj = weightsAvgData?.weight_avg || {};
+    const weightsTotal = Object.values(weightAvgObj).reduce((s, v) => s + Number(v || 0), 0) || 1;
+    const weights = Object.entries(weightAvgObj)
+      .map(([critId, value]) => ({
+        name: critName(critId),
+        value: Math.round((Number(value) / weightsTotal) * 100),
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    // ── ROHDATEN aufbauen (Fragen als Zeilen, Alternativen als Spalten) ──
+    // Struktur die die Tabelle erwartet:
+    //   [ { alternative: "Restaurant A",
+    //       essen:   { values: [...], weights: [...] },
+    //       service: { values: [...], weights: [...] } }, ... ]
+    const rawData = buildRawData(userScores, rawWeights, alternativesMap, criteriaMap, altName, critName);
 
     return {
       responses,
@@ -362,13 +470,62 @@ async function fetchProjectResults(projectId) {
       ranking,
       criteriaAvg,
       weights,
-      scoreRange: scoreRangeData, // Falls du das auch brauchst
+      rawData,
     };
   } catch (error) {
     console.error("API Error:", error);
     throw error;
   }
 }
+
+// Baut die Rohdaten-Struktur für die Tabelle aus den flachen Backend-Listen.
+function buildRawData(userScores, rawWeights, alternativesMap, criteriaMap, altName, critName) {
+  // Alle Alternativen- und Kriterien-IDs bestimmen
+  const altIds = alternativesMap && Object.keys(alternativesMap).length
+    ? Object.keys(alternativesMap)
+    : [...new Set(userScores.map(s => String(s.alternative_id)))];
+  const critIds = criteriaMap && Object.keys(criteriaMap).length
+    ? Object.keys(criteriaMap)
+    : [...new Set(userScores.map(s => String(s.criterion_id)))];
+
+  // Bewertungen gruppieren: values[altId][critId] = [wert, wert, ...]
+  const values = {};
+  userScores.forEach(s => {
+    const a = String(s.alternative_id);
+    const c = String(s.criterion_id);
+    const v = pickValue(s);
+    if (v == null) return;
+    values[a] = values[a] || {};
+    values[a][c] = values[a][c] || [];
+    values[a][c].push(v);
+  });
+
+  // Gewichtungen gruppieren: weightsByCrit[critId] = [gewicht, gewicht, ...]
+  // (eine Gewichtung pro Kriterium pro Person, unabhängig von der Alternative)
+  const weightsByCrit = {};
+  (rawWeights || []).forEach(w => {
+    const c = String(w.criterion_id);
+    const v = pickValue(w);
+    if (v == null) return;
+    weightsByCrit[c] = weightsByCrit[c] || [];
+    weightsByCrit[c].push(v);
+  });
+
+  // Zusammenbauen: pro Alternative ein Objekt, pro Kriterium ein Feld
+  return altIds.map(a => {
+    const row = { alternative: altName(a) };
+    critIds.forEach(c => {
+      // Feldname = Kriteriumsname in Kleinbuchstaben (passt zur Tabelle)
+      const key = critName(c).toLowerCase();
+      row[key] = {
+        values: values[a]?.[c] || [],
+        weights: weightsByCrit[c] || [],
+      };
+    });
+    return row;
+  });
+}
+
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  Hauptkomponente                                                  ║
@@ -377,7 +534,7 @@ async function fetchProjectResults(projectId) {
 export default function Analytics({ surveys, t = {} }) {
   const surveyList = surveys && surveys.length > 0 ? surveys : [];
 
-  // Texte mit Fallback (DE)
+  // Texte mit Fallback (DE) — alle Strings kommen jetzt aus translations.js
   const tx = {
     analyticsTitle: t.analyticsTitle || "Auswertung",
     analyticsSubtitle:
@@ -386,6 +543,7 @@ export default function Analytics({ surveys, t = {} }) {
     metricRanking: t.metricRanking || "Ranking der Alternativen",
     metricCriteria: t.metricCriteria || "Ø-Bewertung Alternativen",
     metricWeights: t.metricWeights || "Gewichtung der Kriterien",
+    metricRawData: t.metricRawData || "Rohdaten",
     chartBar: t.chartBar || "Balken",
     chartPie: t.chartPie || "Torte",
     chartTable: t.chartTable || "Tabelle",
@@ -393,9 +551,21 @@ export default function Analytics({ surveys, t = {} }) {
     kpiCompletion: t.kpiCompletion || "Abschlussrate",
     kpiTop: t.kpiTop || "Top-Alternative",
     noData: t.noDataForSurvey || "Keine Daten fuer diese Umfrage.",
+    exportCsv: t.analyticsExportCsv || "CSV exportieren",
+    loadingData: t.analyticsLoading || t.loading || "Daten werden geladen...",
+    colName: t.analyticsColName || "Name",
+    colQuestion: t.analyticsColQuestion || "Frage",
+    colWeight: t.analyticsColWeight || "Gewichtung",
+    valueLabelCriteria: t.analyticsValueCriteria || "Ø (0-5)",
+    valueLabelWeight: t.analyticsValueWeight || "Gewicht",
+    valueLabelScore: t.analyticsValueScore || "Score",
+    unnamedSurvey: t.analyticsUnnamedSurvey || t.untitled || "Unbenannte Umfrage",
+    loadError: t.analyticsLoadError || "Fehler beim Laden der Daten",
+    errorPrefix: t.errorLoadingPrefix || "❌ Fehler beim Laden der Daten:",
+    noRawDataAlert: t.analyticsNoRawDataAlert || "Keine Rohdaten zum Exportieren vorhanden!",
   };
 
-  const [surveyId, setSurveyId] = useState(surveyList[0]?.id);
+  const [surveyId, setSurveyId] = useState(() => surveyList[0]?.id || null);
   const [metric, setMetric] = useState("ranking");
   const [chartType, setChartType] = useState("bar");
   const [loading, setLoading] = useState(false);
@@ -416,7 +586,7 @@ export default function Analytics({ surveys, t = {} }) {
       })
       .catch((err) => {
         console.error(err);
-        setError(err.message || "Fehler beim Laden der Daten");
+        setError(err.message || tx.loadError);
         setData(EMPTY_RESULT);
         setLoading(false);
       });
@@ -425,24 +595,25 @@ export default function Analytics({ surveys, t = {} }) {
   const current = useMemo(() => {
     switch (metric) {
       case "criteria":
-        return {
-          rows: data.criteriaAvg,
-          max: 5,
-          unit: "",
-          valueLabel: "Ø (0-5)",
-        };
+        return { rows: data.criteriaAvg, max: 5, unit: "", valueLabel: tx.valueLabelCriteria };
       case "weights":
-        return {
-          rows: data.weights,
-          max: null,
-          unit: "%",
-          valueLabel: "Gewicht",
-        };
+        return { rows: data.weights, max: null, unit: "%", valueLabel: tx.valueLabelWeight };
+      case "rawdata": {
+        // Kriterium-Namen: bevorzugt aus den Rohdaten-Feldern (behält Reihenfolge),
+        // sonst aus criteriaAvg als Fallback.
+        let criteria;
+        if (data.rawData && data.rawData.length > 0) {
+          criteria = Object.keys(data.rawData[0]).filter(k => k !== "alternative");
+        } else {
+          criteria = data.criteriaAvg?.map(c => c.name) || [];
+        }
+        return { rawData: data.rawData || [], criteria, type: "rawdata" };
+      }
       case "ranking":
       default:
-        return { rows: data.ranking, max: 100, unit: "", valueLabel: "Score" };
+        return { rows: data.ranking, max: 100, unit: "", valueLabel: tx.valueLabelScore };
     }
-  }, [metric, data]);
+  }, [metric, data, tx.valueLabelCriteria, tx.valueLabelWeight, tx.valueLabelScore]);
 
   const topAlternative = data.ranking?.[0]?.name || "-";
 
@@ -453,6 +624,19 @@ export default function Analytics({ surveys, t = {} }) {
           <h1 className="dash-title">{tx.analyticsTitle}</h1>
           <p className="dash-sub">{tx.analyticsSubtitle}</p>
         </div>
+        <button
+          className="admin-btn"
+          style={{ marginLeft: "auto", alignSelf: "flex-start" }}
+          onClick={() => {
+            const currentSurvey = surveyList.find(s => String(s.id) === String(surveyId));
+            const surveyName = currentSurvey?.name || tx.unnamedSurvey;
+            const criteria = data.criteriaAvg?.map(c => c.name) ||
+                           Object.keys(data.rawData?.[0] || {}).filter(k => k !== "alternative");
+            exportRawDataToCSV(data.rawData, criteria, surveyName, tx);
+          }}
+        >
+          {tx.exportCsv}
+        </button>
       </header>
 
       {/* Umfrage-Auswahl (Dropdown) */}
@@ -480,9 +664,7 @@ export default function Analytics({ surveys, t = {} }) {
             onChange={(e) => setSurveyId(e.target.value)}
           >
             {surveyList.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name || "Unbenannte Umfrage"}
-              </option>
+              <option key={s.id} value={s.id}>{s.name || tx.unnamedSurvey}</option>
             ))}
           </select>
         </div>
@@ -491,12 +673,12 @@ export default function Analytics({ surveys, t = {} }) {
       {/* Error-Meldung */}
       {error && (
         <div style={{ marginBottom: 16 }}>
-          <ErrorMessage message={error} />
+          <ErrorMessage message={error} prefix={tx.errorPrefix} />
         </div>
       )}
 
       {/* Loading-State */}
-      {loading && <LoadingSpinner />}
+      {loading && <LoadingSpinner text={tx.loadingData} />}
 
       {/* Nur anzeigen wenn keine Loading */}
       {!loading && (
@@ -526,6 +708,7 @@ export default function Analytics({ surveys, t = {} }) {
                 { key: "ranking", label: tx.metricRanking },
                 { key: "criteria", label: tx.metricCriteria },
                 { key: "weights", label: tx.metricWeights },
+                { key: "rawdata", label: tx.metricRawData },
               ].map((m) => (
                 <button
                   key={m.key}
@@ -541,7 +724,7 @@ export default function Analytics({ surveys, t = {} }) {
               ))}
             </div>
             <div className="dash-filters">
-              {[
+              {metric !== "rawdata" && [
                 { key: "bar", label: tx.chartBar },
                 { key: "pie", label: tx.chartPie },
                 { key: "table", label: tx.chartTable },
@@ -563,30 +746,20 @@ export default function Analytics({ surveys, t = {} }) {
 
           {/* Diagramm-Bereich */}
           <div className="admin-card" style={{ padding: 24 }}>
-            {chartType === "bar" && (
-              <BarChart
-                data={current.rows}
-                max={current.max}
-                unit={current.unit}
+            {current.type === "rawdata" ? (
+              <RawDataTable
+                data={current.rawData}
+                criteriaList={current.criteria}
                 emptyText={tx.noData}
+                questionLabel={tx.colQuestion}
+                weightLabel={tx.colWeight}
               />
-            )}
-            {chartType === "pie" && (
-              <PieChart
-                data={current.rows.map((d) => ({
-                  name: d.name,
-                  value: d.value ?? d.score,
-                }))}
-                emptyText={tx.noData}
-              />
-            )}
-            {chartType === "table" && (
-              <DataTable
-                data={current.rows}
-                valueLabel={current.valueLabel}
-                unit={current.unit}
-                emptyText={tx.noData}
-              />
+            ) : chartType === "bar" ? (
+              <BarChart data={current.rows} max={current.max} unit={current.unit} emptyText={tx.noData} />
+            ) : chartType === "pie" ? (
+              <PieChart data={current.rows.map((d) => ({ name: d.name, value: d.value ?? d.score }))} emptyText={tx.noData} />
+            ) : (
+              <DataTable data={current.rows} valueLabel={current.valueLabel} unit={current.unit} emptyText={tx.noData} nameLabel={tx.colName} />
             )}
           </div>
         </>

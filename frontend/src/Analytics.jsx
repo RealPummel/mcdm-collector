@@ -6,14 +6,21 @@ import React, { useMemo, useState, useEffect } from "react";
 // Endpoints:
 //   - GET /projects/{project_id}/ → responses
 //   - GET /projects/{project_id}/weighted_sum → ranking scores
-//   - GET /projects/{project_id}/alternatives/score/avg → criteriaAvg
+//   - GET /projects/{project_id}/alternatives/score/avg → Alternative Score Average
 //   - GET /projects/{project_id}/weights/avg → weights
 //   - GET /projects/{project_id}/score_range → score ranges
 // ────────────────────────────────────────────────────────────
 
 const MAROON = "#7a003f";
-const PIE_COLORS = ["#7a003f", "#a83267", "#c76b94", "#e0a6c0", "#5a002e", "#9c5072"];
-const API_BASE_URL = "http://localhost:8000"; 
+const PIE_COLORS = [
+  "#7a003f",
+  "#a83267",
+  "#c76b94",
+  "#e0a6c0",
+  "#5a002e",
+  "#9c5072",
+];
+const API_BASE_URL = "http://localhost:8000";
 
 // Leere Auswertung - Fallback wenn noch keine Daten vorhanden
 const EMPTY_RESULT = {
@@ -43,12 +50,38 @@ function BarChart({ data, max, unit = "", color = MAROON, emptyText }) {
         const pct = Math.round((val / maxVal) * 100);
         return (
           <div key={d.name}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#444", marginBottom: 4 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 13,
+                color: "#444",
+                marginBottom: 4,
+              }}
+            >
               <span>{d.name}</span>
-              <span style={{ fontWeight: "bold", color }}>{val}{unit}</span>
+              <span style={{ fontWeight: "bold", color }}>
+                {val}
+                {unit}
+              </span>
             </div>
-            <div style={{ background: "#f0ecf0", borderRadius: 6, height: 14, overflow: "hidden" }}>
-              <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 6, transition: "width 0.4s ease" }} />
+            <div
+              style={{
+                background: "#f0ecf0",
+                borderRadius: 6,
+                height: 14,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${pct}%`,
+                  height: "100%",
+                  background: color,
+                  borderRadius: 6,
+                  transition: "width 0.4s ease",
+                }}
+              />
             </div>
           </div>
         );
@@ -62,7 +95,9 @@ function PieChart({ data, emptyText }) {
   if (!data.length) return <EmptyHint text={emptyText} />;
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   let cumulative = 0;
-  const radius = 80, cx = 100, cy = 100;
+  const radius = 80,
+    cx = 100,
+    cy = 100;
 
   const slices = data.map((d, i) => {
     const startAngle = (cumulative / total) * 2 * Math.PI;
@@ -78,18 +113,49 @@ function PieChart({ data, emptyText }) {
   });
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 24,
+        flexWrap: "wrap",
+      }}
+    >
       <svg width="200" height="200" viewBox="0 0 200 200">
         {slices.map((s) => (
-          <path key={s.name} d={s.path} fill={s.color} stroke="#fff" strokeWidth="2" />
+          <path
+            key={s.name}
+            d={s.path}
+            fill={s.color}
+            stroke="#fff"
+            strokeWidth="2"
+          />
         ))}
       </svg>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {slices.map((s) => (
-          <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 3, background: s.color, display: "inline-block" }} />
+          <div
+            key={s.name}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13,
+            }}
+          >
+            <span
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 3,
+                background: s.color,
+                display: "inline-block",
+              }}
+            />
             <span>{s.name}</span>
-            <span style={{ color: "#888" }}>{Math.round((s.value / total) * 100)}%</span>
+            <span style={{ color: "#888" }}>
+              {Math.round((s.value / total) * 100)}%
+            </span>
           </div>
         ))}
       </div>
@@ -208,9 +274,27 @@ function DataTable({ data, valueLabel, unit = "", emptyText, nameLabel }) {
       <tbody>
         {data.map((d) => (
           <tr key={d.name}>
-            <td style={{ fontSize: 14, padding: "8px 6px", borderBottom: "1px solid #f3f3f3" }}>{d.name}</td>
-            <td style={{ fontSize: 14, padding: "8px 6px", borderBottom: "1px solid #f3f3f3", textAlign: "right", fontWeight: "bold", color: MAROON }}>
-              {(d.value ?? d.score)}{unit}
+            <td
+              style={{
+                fontSize: 14,
+                padding: "8px 6px",
+                borderBottom: "1px solid #f3f3f3",
+              }}
+            >
+              {d.name}
+            </td>
+            <td
+              style={{
+                fontSize: 14,
+                padding: "8px 6px",
+                borderBottom: "1px solid #f3f3f3",
+                textAlign: "right",
+                fontWeight: "bold",
+                color: MAROON,
+              }}
+            >
+              {d.value ?? d.score}
+              {unit}
             </td>
           </tr>
         ))}
@@ -448,15 +532,16 @@ function buildRawData(userScores, rawWeights, alternativesMap, criteriaMap, altN
 // ╚══════════════════════════════════════════════════════════════════╝
 
 export default function Analytics({ surveys, t = {} }) {
-  const surveyList = (surveys && surveys.length > 0) ? surveys : [];
+  const surveyList = surveys && surveys.length > 0 ? surveys : [];
 
   // Texte mit Fallback (DE) — alle Strings kommen jetzt aus translations.js
   const tx = {
     analyticsTitle: t.analyticsTitle || "Auswertung",
-    analyticsSubtitle: t.analyticsSubtitle || "Ergebnisse der Umfrage ansehen und filtern.",
+    analyticsSubtitle:
+      t.analyticsSubtitle || "Ergebnisse der Umfrage ansehen und filtern.",
     selectSurvey: t.analyticsSelectSurvey || "Umfrage",
     metricRanking: t.metricRanking || "Ranking der Alternativen",
-    metricCriteria: t.metricCriteria || "Ø-Bewertung pro Kriterium",
+    metricCriteria: t.metricCriteria || "Ø-Bewertung Alternativen",
     metricWeights: t.metricWeights || "Gewichtung der Kriterien",
     metricRawData: t.metricRawData || "Rohdaten",
     chartBar: t.chartBar || "Balken",
@@ -495,11 +580,11 @@ export default function Analytics({ surveys, t = {} }) {
     setError(null);
 
     fetchProjectResults(surveyId)
-      .then(results => {
+      .then((results) => {
         setData(results);
         setLoading(false);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error(err);
         setError(err.message || tx.loadError);
         setData(EMPTY_RESULT);
@@ -557,10 +642,24 @@ export default function Analytics({ surveys, t = {} }) {
       {/* Umfrage-Auswahl (Dropdown) */}
       {surveyList.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 4 }}>{tx.selectSurvey}</label>
+          <label
+            style={{
+              display: "block",
+              fontSize: 13,
+              color: "#666",
+              marginBottom: 4,
+            }}
+          >
+            {tx.selectSurvey}
+          </label>
           <select
             className="dash-status-select"
-            style={{ width: "100%", maxWidth: 360, padding: "10px 12px", fontSize: 14 }}
+            style={{
+              width: "100%",
+              maxWidth: 360,
+              padding: "10px 12px",
+              fontSize: 14,
+            }}
             value={surveyId || ""}
             onChange={(e) => setSurveyId(e.target.value)}
           >
@@ -595,7 +694,9 @@ export default function Analytics({ surveys, t = {} }) {
               <span className="dash-stat-label">{tx.kpiCompletion}</span>
             </div>
             <div className="dash-stat">
-              <span className="dash-stat-num" style={{ fontSize: 20 }}>{topAlternative}</span>
+              <span className="dash-stat-num" style={{ fontSize: 20 }}>
+                {topAlternative}
+              </span>
               <span className="dash-stat-label">{tx.kpiTop}</span>
             </div>
           </div>
@@ -611,7 +712,11 @@ export default function Analytics({ surveys, t = {} }) {
               ].map((m) => (
                 <button
                   key={m.key}
-                  className={metric === m.key ? "dash-chip dash-chip-active" : "dash-chip"}
+                  className={
+                    metric === m.key
+                      ? "dash-chip dash-chip-active"
+                      : "dash-chip"
+                  }
                   onClick={() => setMetric(m.key)}
                 >
                   {m.label}
@@ -626,7 +731,11 @@ export default function Analytics({ surveys, t = {} }) {
               ].map((c) => (
                 <button
                   key={c.key}
-                  className={chartType === c.key ? "dash-chip dash-chip-active" : "dash-chip"}
+                  className={
+                    chartType === c.key
+                      ? "dash-chip dash-chip-active"
+                      : "dash-chip"
+                  }
                   onClick={() => setChartType(c.key)}
                 >
                   {c.label}

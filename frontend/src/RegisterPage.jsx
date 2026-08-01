@@ -13,7 +13,6 @@ import { supabase } from "./supabaseClient";
 //
 // Hinweis fürs Team: Damit der Link hierher führt, muss in den Supabase-
 // Einstellungen die "Redirect URL" auf diese Seite zeigen
-// (z. B. https://deine-app.vercel.app/?register=1 oder eine eigene Route).
 // ────────────────────────────────────────────────────────────
 
 export default function RegisterPage({ onRegistered, onBackToLogin, t = {} }) {

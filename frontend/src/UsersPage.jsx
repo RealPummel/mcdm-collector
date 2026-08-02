@@ -28,15 +28,30 @@ export default function UsersPage({ t }) {
   };
 
   const generateLink = async () => {
-    if (!selectedProject) { setLinkError(t.linkGenErrorSurvey); return; }
-    if (!dmName.trim()) { setLinkError(t.linkGenErrorName); return; }
+    if (!selectedProject) {
+      setLinkError(t.linkGenErrorSurvey);
+      return;
+    }
+    if (!dmName.trim()) {
+      setLinkError(t.linkGenErrorName);
+      return;
+    }
     setLinkError("");
     setLinkLoading(true);
     try {
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const expiresAt = new Date(
+        Date.now() + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString();
       const { data, error } = await supabase
         .from("decision_makers")
-        .insert([{ name: dmName.trim(), project_id: parseInt(selectedProject), is_submitted: false, expires_at: expiresAt }])
+        .insert([
+          {
+            name: dmName.trim(),
+            project_id: parseInt(selectedProject),
+            is_submitted: false,
+            expires_at: expiresAt,
+          },
+        ])
         .select()
         .single();
 
@@ -57,23 +72,53 @@ export default function UsersPage({ t }) {
   };
 
   // ── Add new admin ──
-  const addUser = () => {
-    if (!email.trim()) { setError(t.enterEmail); return; }
-    if (users.find(u => u.email === email)) { setError(t.userExists); return; }
-    setUsers([...users, { id: Date.now(), email, role: "admin", status: "pending" }]);
-    setEmail("");
+
+  const addUser = async () => {
+    if (!email.trim()) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
     setError("");
-    setSuccess(t.userInvited);
-    setTimeout(() => setSuccess(""), 3000);
+    setSuccess("");
+
+    try {
+      const response = await fetch("http://localhost:8000/api/invite-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          redirect_to: `${window.location.origin}/set-password`,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Failed to send invitation.");
+      }
+
+      setSuccess(`Invitation successfully sent to ${email}!`);
+      setEmail("");
+
+      setUsers((prev) => [
+        ...prev,
+        { id: Date.now(), email, role: "admin", status: "pending" },
+      ]);
+    } catch (err) {
+      console.error("Error inviting user:", err.message);
+      setError(err.message);
+    }
   };
 
   const removeUser = (id) => {
-    setUsers(users.filter(u => u.id !== id));
+    setUsers(users.filter((u) => u.id !== id));
   };
 
   return (
     <div className="admin-container">
-
       <div className="admin-header">
         <h1>{t.linkGenTitle}</h1>
         <p>{t.linkGenSubtitle}</p>
@@ -85,13 +130,23 @@ export default function UsersPage({ t }) {
         <label>{t.linkGenSelectSurvey}</label>
         <select
           className="dash-status-select"
-          style={{ width: "100%", marginBottom: 12, padding: "8px 10px", fontSize: 14 }}
+          style={{
+            width: "100%",
+            marginBottom: 12,
+            padding: "8px 10px",
+            fontSize: 14,
+          }}
           value={selectedProject}
-          onChange={e => { setSelectedProject(e.target.value); setGeneratedLink(""); }}
+          onChange={(e) => {
+            setSelectedProject(e.target.value);
+            setGeneratedLink("");
+          }}
         >
           <option value="">{t.linkGenSelectPlaceholder}</option>
-          {projects.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
           ))}
         </select>
 
@@ -99,11 +154,19 @@ export default function UsersPage({ t }) {
         <div className="row-input-group">
           <input
             value={dmName}
-            onChange={e => { setDmName(e.target.value); setLinkError(""); setGeneratedLink(""); }}
+            onChange={(e) => {
+              setDmName(e.target.value);
+              setLinkError("");
+              setGeneratedLink("");
+            }}
             placeholder={t.linkGenNamePlaceholder}
-            onKeyDown={e => e.key === "Enter" && generateLink()}
+            onKeyDown={(e) => e.key === "Enter" && generateLink()}
           />
-          <button className="add-row-btn" onClick={generateLink} disabled={linkLoading}>
+          <button
+            className="add-row-btn"
+            onClick={generateLink}
+            disabled={linkLoading}
+          >
             {linkLoading ? "..." : "+"}
           </button>
         </div>
@@ -111,16 +174,35 @@ export default function UsersPage({ t }) {
         {linkError && <p className="error-msg">{linkError}</p>}
 
         {generatedLink && (
-          <div style={{ marginTop: 12, padding: "10px 12px", background: "#f6f6f6", borderRadius: 6, border: "1px solid #e0e0e0" }}>
-            <p style={{ fontSize: 12, color: "#888", margin: "0 0 6px" }}>{t.linkGenLabel}</p>
+          <div
+            style={{
+              marginTop: 12,
+              padding: "10px 12px",
+              background: "#f6f6f6",
+              borderRadius: 6,
+              border: "1px solid #e0e0e0",
+            }}
+          >
+            <p style={{ fontSize: 12, color: "#888", margin: "0 0 6px" }}>
+              {t.linkGenLabel}
+            </p>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
                 readOnly
                 value={generatedLink}
-                style={{ flex: 1, fontSize: 12, padding: "6px 8px", border: "1px solid #ddd", borderRadius: 4, background: "white" }}
-                onClick={e => e.target.select()}
+                style={{
+                  flex: 1,
+                  fontSize: 12,
+                  padding: "6px 8px",
+                  border: "1px solid #ddd",
+                  borderRadius: 4,
+                  background: "white",
+                }}
+                onClick={(e) => e.target.select()}
               />
-              <button className="toggle-btn" onClick={copyLink}>{t.linkGenCopy}</button>
+              <button className="toggle-btn" onClick={copyLink}>
+                {t.linkGenCopy}
+              </button>
             </div>
           </div>
         )}
@@ -137,27 +219,41 @@ export default function UsersPage({ t }) {
         <div className="row-input-group">
           <input
             value={email}
-            onChange={e => { setEmail(e.target.value); setError(""); }}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError("");
+            }}
             placeholder="colleague@ovgu.de"
-            onKeyDown={e => e.key === "Enter" && addUser()}
+            onKeyDown={(e) => e.key === "Enter" && addUser()}
           />
-          <button className="add-row-btn" onClick={addUser}>+</button>
+          <button className="add-row-btn" onClick={addUser}>
+            +
+          </button>
         </div>
         {error && <p className="error-msg">{error}</p>}
         {success && <p className="success-msg">{success}</p>}
-        <p style={{ fontSize: 12, color: "#aaa", marginTop: 8 }}>{t.inviteHint}</p>
+        <p style={{ fontSize: 12, color: "#aaa", marginTop: 8 }}>
+          {t.inviteHint}
+        </p>
       </div>
 
       <div className="admin-card">
-        <h2>{t.admins} <span className="count">{users.length}</span></h2>
-        {users.map(u => (
+        <h2>
+          {t.admins} <span className="count">{users.length}</span>
+        </h2>
+        {users.map((u) => (
           <div key={u.id} className="question-item">
             <div className="question-item-info">
               <strong>{u.email}</strong>
               <span className="rows-preview">
                 {u.role} ·
-                <span style={{ color: u.status === "active" ? "#1e7e34" : "#e67e00" }}>
-                  {" "}{u.status}
+                <span
+                  style={{
+                    color: u.status === "active" ? "#1e7e34" : "#e67e00",
+                  }}
+                >
+                  {" "}
+                  {u.status}
                 </span>
               </span>
             </div>
@@ -169,7 +265,6 @@ export default function UsersPage({ t }) {
           </div>
         ))}
       </div>
-
     </div>
   );
 }

@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Request, Query
+from fastapi import FastAPI, Request, Query, HTTPException, status
 from typing import Optional, List
+from pydantic import BaseModel, EmailStr
 from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
@@ -12,6 +13,7 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     SUPABASE_URL: str = os.getenv("SUPABASE_URL")
+    # MUST use SUPABASE_SERVICE_ROLE_KEY for auth admin actions like invite
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY")
     supabase_client: Client = create_client(supabase_url=SUPABASE_URL, supabase_key=SUPABASE_KEY)
     app.state.supabase = supabase_client
@@ -94,3 +96,22 @@ async def get_score_range(project_id: int, request: Request):
         weights={int(crit_id): value for crit_id, value in weights.items()},
         ratings=ratings
     )
+    
+class InviteRequest(BaseModel):
+    email: EmailStr
+    redirect_to: str = "http://localhost:5173"
+
+@app.post("/api/invite-user")
+async def invite_user(payload: InviteRequest, request: Request):
+    supabase: Client = request.app.state.supabase
+    try:
+        response = supabase.auth.admin.invite_user_by_email(
+            payload.email,
+            options={"redirect_to": payload.redirect_to}
+        )
+        return {"status": "success", "data": response}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

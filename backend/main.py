@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from logic import calculate_weighted_sum, calculate_score_range
+from backend.logic import calculate_weighted_sum, calculate_score_range
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()

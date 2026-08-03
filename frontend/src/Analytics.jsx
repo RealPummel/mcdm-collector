@@ -372,6 +372,8 @@ function csvEscape(value, sep) {
 ---------
 // CSV Export für Rohdaten (Fragen als Zeilen, Gewichtung als Spalte 2, Alternativen als Spalten)
 function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
+    console.log("EXPORT rawData", rawData);
+  console.log("EXPORT criteria", criteria);
   if (!rawData || rawData.length === 0) {
     alert(tx.noRawDataAlert);
     return;

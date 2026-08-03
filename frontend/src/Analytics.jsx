@@ -20,7 +20,8 @@ const PIE_COLORS = [
   "#5a002e",
   "#9c5072",
 ];
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 // Leere Auswertung - Fallback wenn noch keine Daten vorhanden
 const EMPTY_RESULT = {
@@ -545,7 +546,7 @@ async function fetchProjectResults(projectId) {
     const weights = Object.entries(weightAvgObj)
       .map(([critId, value]) => ({
         name: critName(critId),
-        value: Math.round(Number(value)),
+        value: Math.round(Number(value) * 10) / 10,
       }))
       .sort((a, b) => b.value - a.value);
 

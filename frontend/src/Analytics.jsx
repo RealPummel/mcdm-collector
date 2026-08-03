@@ -359,7 +359,7 @@ function LoadingSpinner({ text }) {
     </div>
   );
 }
----------neu
+//---------neu
 // Escaped genau eine CSV-Zelle nach RFC 4180: quoted, wenn nötig,
 // und " innerhalb der Zelle verdoppelt.
 function csvEscape(value, sep) {
@@ -369,7 +369,7 @@ function csvEscape(value, sep) {
   }
   return str;
 }
----------
+//---------
 // CSV Export für Rohdaten (Fragen als Zeilen, Gewichtung als Spalte 2, Alternativen als Spalten)
 function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
     console.log("EXPORT rawData", rawData);

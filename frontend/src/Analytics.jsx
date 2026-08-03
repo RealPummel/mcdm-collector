@@ -21,7 +21,7 @@ const PIE_COLORS = [
   "#9c5072",
 ];
 const API_BASE_URL =
-  import.meta.env.https://improved-rotary-phone-4jrv6x64prpvcqrqg-8000.app.github.dev || "http://localhost:8000";
+  import.meta.env. VITE_API_BASE_URL || "http://localhost:8000";
 
 // Leere Auswertung - Fallback wenn noch keine Daten vorhanden
 const EMPTY_RESULT = {

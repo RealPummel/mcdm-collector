@@ -1,13 +1,16 @@
 services:
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: mcdm_backend
     env_file:
       - .env
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - .:/app
+    working_dir: /app
 
   frontend:
     build: ./frontend

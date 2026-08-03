@@ -417,7 +417,9 @@ async function fetchProjectResults(projectId) {
     const altName = (id) => (alternativesMap && alternativesMap[String(id)]) || `Alternative ${id}`;
     const critName = (id) => (criteriaMap && criteriaMap[String(id)]) || `Criterion ${id}`;
 
-    const userScores = userScoresData?.user_scores || [];
+    const userScores = Array.isArray(userScoresData?.user_scores)
+  ? userScoresData.user_scores
+  : [];
     const rawWeights = Array.isArray(weightsData) ? weightsData : (weightsData?.weights || []);
 
     // ── Anzahl Antworten (eindeutige Personen, falls user_id vorhanden) ──

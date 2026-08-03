@@ -487,20 +487,30 @@ async function fetchProjectResults(projectId) {
     const critName = (id) =>
       (criteriaMap && criteriaMap[String(id)]) || `Criterion ${id}`;
 
-    const userScores = Array.isArray(userScoresData?.user_scores)
-      ? userScoresData.user_scores
-      : [];
+    const userScoresRaw = userScoresData?.user_scores;
+    const userScores = Array.isArray(userScoresRaw) ? userScoresRaw : [];
     const rawWeights = Array.isArray(weightsData)
       ? weightsData
       : weightsData?.weights || [];
 
-    // ── Anzahl Antworten (eindeutige Personen, falls user_id vorhanden) ──
-    const uniqueUsers = new Set(
-      userScores
-        .map((s) => s.user_id ?? s.dm_id ?? s.decision_maker_id)
-        .filter((v) => v != null),
-    );
-    const responses = uniqueUsers.size || userScores.length;
+    // ── Anzahl Antworten ──
+    // Fall 1: Backend liefert eine flache Liste (mit user_id/dm_id) → eindeutige Personen zählen.
+    // Fall 2 (aktuell): Backend liefert { criterion_id: [wert, wert, ...] } — ein Wert pro
+    // eingereichter Antwort, für jedes Kriterium gleich viele → Array-Länge = Antwortzahl.
+    let responses;
+    if (Array.isArray(userScoresRaw)) {
+      const uniqueUsers = new Set(
+        userScores
+          .map((s) => s.user_id ?? s.dm_id ?? s.decision_maker_id)
+          .filter((v) => v != null),
+      );
+      responses = uniqueUsers.size || userScores.length;
+    } else {
+      const counts = Object.values(userScoresRaw || {}).map((arr) =>
+        Array.isArray(arr) ? arr.length : 0,
+      );
+      responses = counts.length ? Math.max(...counts) : 0;
+    }
     const completionRate = 0; // Backend liefert (noch) keine Abschlussrate
 
     // ── Ranking aus weighted_sum ──

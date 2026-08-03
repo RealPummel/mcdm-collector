@@ -776,11 +776,9 @@ export default function Analytics({ surveys, t = {} }) {
               (s) => String(s.id) === String(surveyId),
             );
             const surveyName = currentSurvey?.name || tx.unnamedSurvey;
-            const criteria =
-              data.alternativeAvg?.map((c) => c.name) ||
-              Object.keys(data.rawData?.[0] || {}).filter(
-                (k) => k !== "alternative",
-              );
+           const criteria = Object.keys(data.rawData?.[0] || {}).filter(
+  (k) => k !== "alternative"
+);
             exportRawDataToCSV(data.rawData, criteria, surveyName, tx);
           }}
         >

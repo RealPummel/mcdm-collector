@@ -23,7 +23,9 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", 
+                  "https://improved-rotary-phone-4jrv6x64prpvcqrqg-5173.app.github.dev"
+                  ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

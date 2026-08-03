@@ -20,8 +20,7 @@ const PIE_COLORS = [
   "#5a002e",
   "#9c5072",
 ];
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 // Leere Auswertung - Fallback wenn noch keine Daten vorhanden
 const EMPTY_RESULT = {

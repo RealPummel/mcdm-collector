@@ -359,7 +359,17 @@ function LoadingSpinner({ text }) {
     </div>
   );
 }
-
+---------neu
+// Escaped genau eine CSV-Zelle nach RFC 4180: quoted, wenn nötig,
+// und " innerhalb der Zelle verdoppelt.
+function csvEscape(value, sep) {
+  const str = String(value ?? "");
+  if (str.includes(sep) || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+---------
 // CSV Export für Rohdaten (Fragen als Zeilen, Gewichtung als Spalte 2, Alternativen als Spalten)
 function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
   if (!rawData || rawData.length === 0) {
@@ -390,13 +400,13 @@ function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
 
     // Gewichtungen für dieses Kriterium (2. Spalte)
     const weights = rawData[0]?.[crit.toLowerCase()]?.weights || [];
-    row.push(`{${weights.join(",")}}`);
+    row.push(csvEscape(`{${weights.join(",")}}`, SEP));
 
     // Für jede Alternative die Bewertungen
     rawData.forEach((alt) => {
       const critData = alt[crit.toLowerCase()];
       const values = critData?.values || [];
-      row.push(`{${values.join(",")}}`);
+      row.push(csvEscape(`{${values.join(",")}}`, SEP));
     });
 
     csvContent += row.join(SEP) + "\n";

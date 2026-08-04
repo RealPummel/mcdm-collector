@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Query, HTTPException, status
+from fastapi import Depends, FastAPI, Header, Request, Query, HTTPException, status
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 from contextlib import asynccontextmanager
@@ -49,25 +49,43 @@ def _check_id_filter_length(ids: Optional[List[int]]):
             detail=f"Too many ids in filter (max {MAX_ID_FILTER_LENGTH}).",
         )
 
+async def get_current_user(request: Request, authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid Authorization header",
+        )
+    token = authorization.split(" ", 1)[1].strip()
+    supabase: Client = request.app.state.supabase
+    try:
+        result = supabase.auth.get_user(token)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    user = getattr(result, "user", None)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    return user
+
 @app.get("/projects/{project_id}/alternatives")
-async def get_alternatives(project_id: int, request: Request):
+async def get_alternatives(project_id: int, request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
     data = supabase.table("alternatives").select("id, name").eq("project_id", project_id).execute().data
     return {str(row["id"]): row["name"] for row in data}
 
 @app.get("/projects/{project_id}/criteria")
-async def get_criteria(project_id: int, request: Request):
+async def get_criteria(project_id: int, request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
     data = supabase.table("criteria").select("id, label").eq("project_id", project_id).execute().data
     return {str(row["id"]): row["label"] for row in data}
 
 @app.get("/projects/{project_id}/weights")
-async def get_weights(project_id: int, request: Request):
+async def get_weights(project_id: int, request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
     return supabase.rpc("get_weight_values_by_project", {"p_id": project_id}).execute().data
 
 @app.get("/projects/{project_id}/weights/avg")
-async def get_weights_avg(project_id: int, request: Request, criterion_id: Optional[List[int]] = Query(None)):
+async def get_weights_avg(project_id: int, request: Request, criterion_id: Optional[List[int]] = Query(None), user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
     _check_id_filter_length(criterion_id)
     if criterion_id:
@@ -76,7 +94,7 @@ async def get_weights_avg(project_id: int, request: Request, criterion_id: Optio
     return {"weight_avg": supabase.rpc("get_weight_avg_by_project", {"p_id": project_id}).execute().data}
 
 @app.get("/projects/{project_id}/alternatives/score/avg")
-async def get_alternative_avg_score(project_id: int, request: Request, alternative_id: Optional[List[int]] = Query(None)):
+async def get_alternative_avg_score(project_id: int, request: Request, alternative_id: Optional[List[int]] = Query(None), user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
     _check_id_filter_length(alternative_id)
     if alternative_id:
@@ -85,7 +103,7 @@ async def get_alternative_avg_score(project_id: int, request: Request, alternati
     return {"alternative_score_avg": supabase.rpc("get_user_score_avg_by_project", {"p_id": project_id}).execute().data}
 
 @app.get("/projects/{project_id}")
-async def get_user_scores(project_id: int, request: Request):
+async def get_user_scores(project_id: int, request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
     return {"user_scores": supabase.rpc("get_user_rating_by_project", {"p_id": project_id}).execute().data}
 
@@ -100,14 +118,14 @@ def _weighted_sums_by_dm(dm_inputs: dict) -> dict:
     return weighted_sums
 
 @app.get("/projects/{project_id}/weighted_sum")
-async def get_weighted_sum(project_id: int, request: Request):
+async def get_weighted_sum(project_id: int, request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
 
     data = supabase.rpc("get_dm_inputs", {"p_id": project_id}).execute().data or {}
     return {"weighted_sums": _weighted_sums_by_dm(data)}
 
 @app.get("/projects/{project_id}/score_range")
-async def get_score_range(project_id: int, request: Request):
+async def get_score_range(project_id: int, request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
 
     data = supabase.rpc("get_min_and_max_inputs_by_project", {"p_id": project_id}).execute().data or {}
@@ -123,7 +141,7 @@ async def get_score_range(project_id: int, request: Request):
 # Aggregates everything the Analytics dashboard needs into a single response, so the frontend makes one request instead of seven.
 
 @app.get("/projects/{project_id}/analytics")
-async def get_project_analytics(project_id: int, request: Request):
+async def get_project_analytics(project_id: int, request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
 
     def _rpc(name: str, params: dict):
@@ -161,7 +179,7 @@ class InviteRequest(BaseModel):
     redirect_to: str = "http://localhost:5173"
 
 @app.post("/api/invite-user")
-async def invite_user(payload: InviteRequest, request: Request):
+async def invite_user(payload: InviteRequest, request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
     try:
         response = supabase.auth.admin.invite_user_by_email(
@@ -176,12 +194,10 @@ async def invite_user(payload: InviteRequest, request: Request):
         )
 
 @app.get("/api/admin-users")
-async def list_admin_users(request: Request):
+async def list_admin_users(request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
     try:
         response = supabase.auth.admin.list_users()
-        # supabase-py has returned either a bare list or an object with a
-        # `.users` attribute across versions — handle both.
         users = response if isinstance(response, list) else getattr(response, "users", [])
         return {
             "users": [
@@ -200,7 +216,7 @@ async def list_admin_users(request: Request):
         )
 
 @app.delete("/api/admin-users/{user_id}")
-async def delete_admin_user(user_id: str, request: Request):
+async def delete_admin_user(user_id: str, request: Request, user=Depends(get_current_user)):
     supabase: Client = request.app.state.supabase
     try:
         supabase.auth.admin.delete_user(user_id)

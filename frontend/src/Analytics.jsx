@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { getAuthHeaders } from "./supabaseClient";
 
 // ────────────────────────────────────────────────────────────
 // Analytics / Auswertung fürs Dashboard
@@ -19,7 +20,8 @@ const PIE_COLORS = [
   "#5a002e",
   "#9c5072",
 ];
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 // Leere Auswertung - Fallback wenn noch keine Daten vorhanden
 const EMPTY_RESULT = {
@@ -363,7 +365,12 @@ function LoadingSpinner({ text }) {
 // und " innerhalb der Zelle verdoppelt.
 function csvEscape(value, sep) {
   const str = String(value ?? "");
-  if (str.includes(sep) || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+  if (
+    str.includes(sep) ||
+    str.includes('"') ||
+    str.includes("\n") ||
+    str.includes("\r")
+  ) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
@@ -459,18 +466,20 @@ function pickValue(obj) {
 
 async function fetchProjectResults(projectId) {
   try {
+    const headers = await getAuthHeaders();
     const analytics = await fetch(
       `${API_BASE_URL}/projects/${projectId}/analytics`,
+      { headers },
     ).then((r) => r.json());
 
-    // Reshaped into the same local shapes the rest of this function
-    // already expects, so only the fetch above had to change.
     const userScoresData = { user_scores: analytics?.user_scores }; // { user_scores: [ {alternative_id, criterion_id, value, user_id?} ] }
     const weightsData = analytics?.weights; // [ {criterion_id, value, user_id?} ]  (Rohgewichte pro Person)
     const alternativesMap = analytics?.alternatives; // { "5": "Restaurant A", ... }
     const criteriaMap = analytics?.criteria; // { "2": "Essen", ... }
     const weightedSumData = { weighted_sums: analytics?.weighted_sums }; // { weighted_sums: { dm_id: { alt_id: score } } }
-    const scoresAvgData = { alternative_score_avg: analytics?.alternative_score_avg }; // { alternative_score_avg: { crit_id: value } }
+    const scoresAvgData = {
+      alternative_score_avg: analytics?.alternative_score_avg,
+    }; // { alternative_score_avg: { crit_id: value } }
     const weightsAvgData = { weight_avg: analytics?.weight_avg }; // { weight_avg: { crit_id: value } }
 
     // Namen-Lookups (mit Fallback auf ID falls kein Name da ist)
@@ -756,9 +765,9 @@ export default function Analytics({ surveys, t = {} }) {
               (s) => String(s.id) === String(surveyId),
             );
             const surveyName = currentSurvey?.name || tx.unnamedSurvey;
-           const criteria = Object.keys(data.rawData?.[0] || {}).filter(
-  (k) => k !== "alternative"
-);
+            const criteria = Object.keys(data.rawData?.[0] || {}).filter(
+              (k) => k !== "alternative",
+            );
             exportRawDataToCSV(data.rawData, criteria, surveyName, tx);
           }}
         >

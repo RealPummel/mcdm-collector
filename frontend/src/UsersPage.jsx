@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "./supabaseClient";
+import { supabase, getAuthHeaders } from "./supabaseClient";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 export default function UsersPage({ t }) {
   const [users, setUsers] = useState([]);
@@ -37,7 +38,9 @@ export default function UsersPage({ t }) {
   const loadUsers = async () => {
     setUsersLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin-users`);
+      const response = await fetch(`${API_BASE_URL}/api/admin-users`, {
+        headers: await getAuthHeaders(),
+      });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.detail || "Failed to load admins.");
@@ -118,6 +121,7 @@ export default function UsersPage({ t }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(await getAuthHeaders()),
         },
         body: JSON.stringify({
           email: email.trim(),
@@ -134,9 +138,6 @@ export default function UsersPage({ t }) {
       setSuccess(`Invitation successfully sent to ${email}!`);
       setEmail("");
 
-      // Re-fetch instead of guessing a local row — the invited admin now
-      // exists as a real (unconfirmed) Supabase user with a real id, which
-      // we need in hand for "remove" to work later.
       loadUsers();
     } catch (err) {
       console.error("Error inviting user:", err.message);
@@ -144,16 +145,20 @@ export default function UsersPage({ t }) {
     }
   };
 
-  // Actually revokes the admin's access (deletes the Supabase auth user),
-  // not just a local list item.
   const removeUser = async (id) => {
-    if (!window.confirm(t.confirmRemoveAdmin || "Remove this admin's access? This cannot be undone.")) {
+    if (
+      !window.confirm(
+        t.confirmRemoveAdmin ||
+          "Remove this admin's access? This cannot be undone.",
+      )
+    ) {
       return;
     }
     setError("");
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin-users/${id}`, {
         method: "DELETE",
+        headers: await getAuthHeaders(),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -290,9 +295,15 @@ export default function UsersPage({ t }) {
         <h2>
           {t.admins} <span className="count">{users.length}</span>
         </h2>
-        {usersLoading && <p style={{ color: "#999", fontSize: 13 }}>{t.loading || "Loading..."}</p>}
+        {usersLoading && (
+          <p style={{ color: "#999", fontSize: 13 }}>
+            {t.loading || "Loading..."}
+          </p>
+        )}
         {!usersLoading && users.length === 0 && (
-          <p style={{ color: "#999", fontSize: 13 }}>{t.noAdmins || "No admins yet."}</p>
+          <p style={{ color: "#999", fontSize: 13 }}>
+            {t.noAdmins || "No admins yet."}
+          </p>
         )}
         {users.map((u) => (
           <div key={u.id} className="question-item">

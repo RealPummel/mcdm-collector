@@ -1,3 +1,43 @@
+from unittest.mock import MagicMock
+
+
+def test_get_weights_rejects_missing_auth_header(unauthenticated_client, mock_supabase):
+    response = unauthenticated_client.get("/projects/1/weights")
+
+    assert response.status_code == 401
+    mock_supabase.rpc.assert_not_called()
+
+
+def test_get_weights_rejects_invalid_token(client, mock_supabase):
+    mock_supabase.auth.get_user.return_value = MagicMock(user=None)
+
+    response = client.get("/projects/1/weights")
+
+    assert response.status_code == 401
+    mock_supabase.rpc.assert_not_called()
+
+
+def test_get_weights_rejects_when_token_verification_raises(client, mock_supabase):
+    mock_supabase.auth.get_user.side_effect = Exception("network error")
+
+    response = client.get("/projects/1/weights")
+
+    assert response.status_code == 401
+
+
+def test_invite_user_rejects_missing_auth_header(unauthenticated_client, mock_supabase):
+    response = unauthenticated_client.post("/api/invite-user", json={"email": "x@example.com"})
+
+    assert response.status_code == 401
+    mock_supabase.auth.admin.invite_user_by_email.assert_not_called()
+
+
+def test_admin_users_list_rejects_missing_auth_header(unauthenticated_client, mock_supabase):
+    response = unauthenticated_client.get("/api/admin-users")
+
+    assert response.status_code == 401
+
+
 def test_get_weights(client, mock_supabase):
     mock_supabase.rpc.return_value.execute.return_value.data = [3, 5, 1]
 

@@ -1,7 +1,7 @@
-from typing import Dict, List
+from typing import Any, Dict, List
 
-def calculate_weighted_sum(weights: Dict[int, float], 
-                           ratings: List[Dict[int, any]]
+def calculate_weighted_sum(weights: Dict[int, float],
+                           ratings: List[Dict[str, Any]]
                            ) -> Dict[int, float]:
     
     scores: Dict[int, float] = {}
@@ -56,19 +56,11 @@ def calculate_score_range(weights: Dict[int, dict], # {criterion_id: {"min": x, 
             avg_weight = (w["min"] + w["max"]) / 2
             avg_rating = (bounds["min"] + bounds["max"]) / 2
             
-            # Calculate new span if one criteria is set to average
+            term_min = w["min"] * bounds["min"]
+            term_max = w["max"] * bounds["max"]
             
-            new_min = avg_weight * avg_rating + sum(
-                weights[int(crit)]["min"] * bound["min"]
-                for crit, bound in criteria.items()
-                if int(crit) != crit_id_int and int(crit) in weights
-            )
-            
-            new_max = avg_weight * avg_rating + sum(
-                weights[int(crit)]["max"] * bound["max"]
-                for crit, bound in criteria.items()
-                if int(crit) != crit_id_int and int(crit) in weights
-            )
+            new_min = avg_weight * avg_rating + (min_score - term_min)
+            new_max = avg_weight * avg_rating + (max_score - term_max)
             
             new_span = new_max - new_min
             

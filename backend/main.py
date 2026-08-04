@@ -21,11 +21,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Comma-separated list of allowed frontend origins, e.g.
+#   CORS_ALLOWED_ORIGINS=http://localhost:5173,https://my-app.example.com
+# Falls back to local dev only. Note: browsers send Origin without a
+# trailing slash, so entries here must not have one either or they will
+# never match.
+_allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", 
-                  "https://silver-spoon-69p5wjw6x5g5hr55q-5173.app.github.dev/"
-                  ],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

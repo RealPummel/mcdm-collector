@@ -3,12 +3,11 @@ import React, { useMemo, useState, useEffect } from "react";
 // ────────────────────────────────────────────────────────────
 // Analytics / Auswertung fürs Dashboard
 //
-// Endpoints:
-//   - GET /projects/{project_id}/ → responses
-//   - GET /projects/{project_id}/weighted_sum → ranking scores
-//   - GET /projects/{project_id}/alternatives/score/avg → Alternative Score Average
-//   - GET /projects/{project_id}/weights/avg → weights
-//   - GET /projects/{project_id}/score_range → score ranges
+// Endpoint:
+//   - GET /projects/{project_id}/analytics → everything below in one call
+//     (user_scores, weights, alternatives, criteria, weighted_sums,
+//     alternative_score_avg, weight_avg) — see backend/main.py's
+//     get_project_analytics, which replaced 7 separate round trips.
 // ────────────────────────────────────────────────────────────
 
 const MAROON = "#7a003f";
@@ -372,8 +371,6 @@ function csvEscape(value, sep) {
 //---------
 // CSV Export für Rohdaten (Fragen als Zeilen, Gewichtung als Spalte 2, Alternativen als Spalten)
 function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
-    console.log("EXPORT rawData", rawData);
-  console.log("EXPORT criteria", criteria);
   if (!rawData || rawData.length === 0) {
     alert(tx.noRawDataAlert);
     return;
@@ -462,36 +459,19 @@ function pickValue(obj) {
 
 async function fetchProjectResults(projectId) {
   try {
-    // Alle nötigen Endpoints parallel abrufen
-    const [
-      userScoresData, // { user_scores: [ {alternative_id, criterion_id, value, user_id?} ] }
-      weightsData, // [ {criterion_id, value, user_id?} ]  (Rohgewichte pro Person)
-      alternativesMap, // { "5": "Restaurant A", ... }
-      criteriaMap, // { "2": "Essen", ... }
-      weightedSumData, // { weighted_sums: { dm_id: { alt_id: score } } }
-      scoresAvgData, // { alternative_score_avg: { crit_id: value } }
-      weightsAvgData, // { weight_avg: { crit_id: value } }
-    ] = await Promise.all([
-      fetch(`${API_BASE_URL}/projects/${projectId}`).then((r) => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/weights`).then((r) =>
-        r.json(),
-      ),
-      fetch(`${API_BASE_URL}/projects/${projectId}/alternatives`).then((r) =>
-        r.json(),
-      ),
-      fetch(`${API_BASE_URL}/projects/${projectId}/criteria`).then((r) =>
-        r.json(),
-      ),
-      fetch(`${API_BASE_URL}/projects/${projectId}/weighted_sum`).then((r) =>
-        r.json(),
-      ),
-      fetch(
-        `${API_BASE_URL}/projects/${projectId}/alternatives/score/avg`,
-      ).then((r) => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/weights/avg`).then((r) =>
-        r.json(),
-      ),
-    ]);
+    const analytics = await fetch(
+      `${API_BASE_URL}/projects/${projectId}/analytics`,
+    ).then((r) => r.json());
+
+    // Reshaped into the same local shapes the rest of this function
+    // already expects, so only the fetch above had to change.
+    const userScoresData = { user_scores: analytics?.user_scores }; // { user_scores: [ {alternative_id, criterion_id, value, user_id?} ] }
+    const weightsData = analytics?.weights; // [ {criterion_id, value, user_id?} ]  (Rohgewichte pro Person)
+    const alternativesMap = analytics?.alternatives; // { "5": "Restaurant A", ... }
+    const criteriaMap = analytics?.criteria; // { "2": "Essen", ... }
+    const weightedSumData = { weighted_sums: analytics?.weighted_sums }; // { weighted_sums: { dm_id: { alt_id: score } } }
+    const scoresAvgData = { alternative_score_avg: analytics?.alternative_score_avg }; // { alternative_score_avg: { crit_id: value } }
+    const weightsAvgData = { weight_avg: analytics?.weight_avg }; // { weight_avg: { crit_id: value } }
 
     // Namen-Lookups (mit Fallback auf ID falls kein Name da ist)
     const altName = (id) =>

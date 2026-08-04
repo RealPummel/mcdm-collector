@@ -89,36 +89,82 @@ async def get_user_scores(project_id: int, request: Request):
     supabase: Client = request.app.state.supabase
     return {"user_scores": supabase.rpc("get_user_rating_by_project", {"p_id": project_id}).execute().data}
 
+def _weighted_sums_by_dm(dm_inputs: dict) -> dict:
+    """Turn { dm_id: {"weights": {...}, "ratings": [...]} } into
+    { dm_id: {alt_id: weighted_score} }."""
+    weighted_sums = {}
+    for dm_id, dm_data in (dm_inputs or {}).items():
+        weights = {int(k): v for k, v in (dm_data["weights"] or {}).items()}
+        ratings = dm_data["ratings"] or []
+        weighted_sums[dm_id] = calculate_weighted_sum(weights, ratings)
+    return weighted_sums
+
 @app.get("/projects/{project_id}/weighted_sum")
 async def get_weighted_sum(project_id: int, request: Request):
     supabase: Client = request.app.state.supabase
-    
-    weighted_sums = {}
-    data = supabase.rpc("get_dm_inputs", {"p_id": project_id}).execute().data or {}
 
-    for input in data.items():
-        dm_id = input[0]
-        dm_data = input[1]
-        weights = {int(k): v for k, v in (dm_data["weights"] or {}).items()}
-        ratings = dm_data["ratings"] or []
-        weighted_sums.update({dm_id: calculate_weighted_sum(weights, ratings)})
-    
-    return {"weighted_sums": weighted_sums}
+    data = supabase.rpc("get_dm_inputs", {"p_id": project_id}).execute().data or {}
+    return {"weighted_sums": _weighted_sums_by_dm(data)}
 
 @app.get("/projects/{project_id}/score_range")
 async def get_score_range(project_id: int, request: Request):
     supabase: Client = request.app.state.supabase
-    
+
     data = supabase.rpc("get_min_and_max_inputs_by_project", {"p_id": project_id}).execute().data or {}
 
     weights = data.get("weights") or {}
     ratings = data.get("ratings") or {}
-    
+
     return calculate_score_range(
         weights={int(crit_id): value for crit_id, value in weights.items()},
         ratings=ratings
     )
-    
+
+# Aggregates everything the Analytics dashboard needs into a single
+# response, so the frontend makes one request instead of seven.
+#
+# NOTE: these Supabase calls are made one at a time, deliberately not
+# fanned out with asyncio.gather()/asyncio.to_thread(). supabase-py's
+# client (and the httpx/HTTP-2 connection it holds) isn't safe to drive
+# concurrently from multiple threads — an earlier version of this endpoint
+# did that and it intermittently corrupted the shared HTTP/2 connection
+# (httpx.RemoteProtocolError: ConnectionTerminated), surfacing as a raw
+# 500. The win here is still real: 7 round trips from the browser become
+# 1; the backend just makes its own Supabase calls sequentially.
+@app.get("/projects/{project_id}/analytics")
+async def get_project_analytics(project_id: int, request: Request):
+    supabase: Client = request.app.state.supabase
+
+    def _rpc(name: str, params: dict):
+        return supabase.rpc(name, params).execute().data
+
+    def _table(name: str, columns: str):
+        return (
+            supabase.table(name)
+            .select(columns)
+            .eq("project_id", project_id)
+            .execute()
+            .data
+        )
+
+    user_scores = _rpc("get_user_rating_by_project", {"p_id": project_id})
+    weights = _rpc("get_weight_values_by_project", {"p_id": project_id})
+    alternatives_rows = _table("alternatives", "id, name")
+    criteria_rows = _table("criteria", "id, label")
+    dm_inputs = _rpc("get_dm_inputs", {"p_id": project_id})
+    alternative_score_avg = _rpc("get_user_score_avg_by_project", {"p_id": project_id})
+    weight_avg = _rpc("get_weight_avg_by_project", {"p_id": project_id})
+
+    return {
+        "user_scores": user_scores,
+        "weights": weights,
+        "alternatives": {str(row["id"]): row["name"] for row in (alternatives_rows or [])},
+        "criteria": {str(row["id"]): row["label"] for row in (criteria_rows or [])},
+        "weighted_sums": _weighted_sums_by_dm(dm_inputs or {}),
+        "alternative_score_avg": alternative_score_avg,
+        "weight_avg": weight_avg,
+    }
+
 class InviteRequest(BaseModel):
     email: EmailStr
     redirect_to: str = "http://localhost:5173"

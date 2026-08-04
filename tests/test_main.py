@@ -25,3 +25,75 @@ def test_alternative_avg_score_rejects_too_many_ids(client, mock_supabase):
 
     assert response.status_code == 400
     mock_supabase.rpc.assert_not_called()
+
+
+def test_get_weighted_sum(client, mock_supabase):
+    mock_supabase.rpc.return_value.execute.return_value.data = {
+        "1": {
+            "weights": {"1": 2.0},
+            "ratings": [{"alternative_id": 10, "criterion_id": 1, "value": 3.0}],
+        }
+    }
+
+    response = client.get("/projects/1/weighted_sum")
+
+    assert response.status_code == 200
+    assert response.json() == {"weighted_sums": {"1": {"10": 6.0}}}
+    mock_supabase.rpc.assert_called_with("get_dm_inputs", {"p_id": 1})
+
+
+def test_get_score_range(client, mock_supabase):
+    mock_supabase.rpc.return_value.execute.return_value.data = {
+        "weights": {"1": {"min": 2.0, "max": 5.0}},
+        "ratings": {"1": {"1": {"min": 3, "max": 5}}},
+    }
+
+    response = client.get("/projects/1/score_range")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["1"]["min_score"] == 6
+    assert body["1"]["max_score"] == 25
+
+
+def test_get_project_analytics(client, mock_supabase):
+    from unittest.mock import MagicMock
+
+    def rpc_side_effect(name, params):
+        data_by_name = {
+            "get_user_rating_by_project": [{"criterion_id": 1, "value": 4}],
+            "get_weight_values_by_project": [2.0],
+            "get_dm_inputs": {
+                "1": {
+                    "weights": {"1": 2.0},
+                    "ratings": [{"alternative_id": 10, "criterion_id": 1, "value": 3.0}],
+                }
+            },
+            "get_user_score_avg_by_project": {"10": 4.2},
+            "get_weight_avg_by_project": {"1": 3.1},
+        }
+        mock = MagicMock()
+        mock.execute.return_value.data = data_by_name[name]
+        return mock
+
+    def table_side_effect(name):
+        data_by_table = {
+            "alternatives": [{"id": 10, "name": "Alt A"}],
+            "criteria": [{"id": 1, "label": "Crit A"}],
+        }
+        mock = MagicMock()
+        mock.select.return_value.eq.return_value.execute.return_value.data = data_by_table[name]
+        return mock
+
+    mock_supabase.rpc.side_effect = rpc_side_effect
+    mock_supabase.table.side_effect = table_side_effect
+
+    response = client.get("/projects/1/analytics")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["alternatives"] == {"10": "Alt A"}
+    assert body["criteria"] == {"1": "Crit A"}
+    assert body["weighted_sums"] == {"1": {"10": 6.0}}
+    assert body["alternative_score_avg"] == {"10": 4.2}
+    assert body["weight_avg"] == {"1": 3.1}

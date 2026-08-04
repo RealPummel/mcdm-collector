@@ -163,6 +163,7 @@ async def get_project_analytics(project_id: int, request: Request, user=Depends(
     dm_inputs = _rpc("get_dm_inputs", {"p_id": project_id})
     alternative_score_avg = _rpc("get_user_score_avg_by_project", {"p_id": project_id})
     weight_avg = _rpc("get_weight_avg_by_project", {"p_id": project_id})
+    decision_maker_rows = _table("decision_makers", "id, is_submitted")
 
     return {
         "user_scores": user_scores,
@@ -172,6 +173,10 @@ async def get_project_analytics(project_id: int, request: Request, user=Depends(
         "weighted_sums": _weighted_sums_by_dm(dm_inputs or {}),
         "alternative_score_avg": alternative_score_avg,
         "weight_avg": weight_avg,
+        "decision_makers": {
+            "total": len(decision_maker_rows or []),
+            "submitted": sum(1 for r in (decision_maker_rows or []) if r.get("is_submitted")),
+        },
     }
 
 class InviteRequest(BaseModel):

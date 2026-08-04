@@ -512,7 +512,14 @@ async function fetchProjectResults(projectId) {
       );
       responses = counts.length ? Math.max(...counts) : 0;
     }
-    const completionRate = 0; // Backend liefert (noch) keine Abschlussrate
+    const decisionMakers = analytics?.decision_makers || {
+      total: 0,
+      submitted: 0,
+    };
+    const completionRate =
+      decisionMakers.total > 0
+        ? Math.round((decisionMakers.submitted / decisionMakers.total) * 100)
+        : 0;
 
     // ── Ranking aus weighted_sum ──
     // Scores über alle Entscheider pro Alternative aufsummieren

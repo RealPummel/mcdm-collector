@@ -120,6 +120,11 @@ def test_get_project_analytics(client, mock_supabase):
         data_by_table = {
             "alternatives": [{"id": 10, "name": "Alt A"}],
             "criteria": [{"id": 1, "label": "Crit A"}],
+            "decision_makers": [
+                {"id": 1, "is_submitted": True},
+                {"id": 2, "is_submitted": True},
+                {"id": 3, "is_submitted": False},
+            ],
         }
         mock = MagicMock()
         mock.select.return_value.eq.return_value.execute.return_value.data = data_by_table[name]
@@ -134,6 +139,7 @@ def test_get_project_analytics(client, mock_supabase):
     body = response.json()
     assert body["alternatives"] == {"10": "Alt A"}
     assert body["criteria"] == {"1": "Crit A"}
+    assert body["decision_makers"] == {"total": 3, "submitted": 2}
     assert body["weighted_sums"] == {"1": {"10": 6.0}}
     assert body["alternative_score_avg"] == {"10": 4.2}
     assert body["weight_avg"] == {"1": 3.1}

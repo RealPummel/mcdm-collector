@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 
-const mockUsers = [
-  { id: 1, email: "admin@ovgu.de", role: "admin", status: "active" },
-];
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 export default function UsersPage({ t }) {
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -20,11 +20,42 @@ export default function UsersPage({ t }) {
 
   useEffect(() => {
     loadProjects();
+    loadUsers();
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data?.user?.id ?? null);
+    });
   }, []);
 
   const loadProjects = async () => {
     const { data } = await supabase.from("projects").select("id, name");
     if (data) setProjects(data);
+  };
+
+  // Pulls the real admin list from the backend (Supabase auth users), so
+  // this reflects who can actually sign in — not just what happened to be
+  // clicked in this browser tab since the page loaded.
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin-users`);
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.detail || "Failed to load admins.");
+      }
+      setUsers(
+        (result.users || []).map((u) => ({
+          id: u.id,
+          email: u.email,
+          role: "admin",
+          status: u.status,
+        })),
+      );
+    } catch (err) {
+      console.error("Error loading admins:", err.message);
+      setError(err.message);
+    } finally {
+      setUsersLoading(false);
+    }
   };
 
   const generateLink = async () => {
@@ -83,7 +114,7 @@ export default function UsersPage({ t }) {
     setSuccess("");
 
     try {
-      const response = await fetch("http://localhost:8000/api/invite-user", {
+      const response = await fetch(`${API_BASE_URL}/api/invite-user`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -103,18 +134,36 @@ export default function UsersPage({ t }) {
       setSuccess(`Invitation successfully sent to ${email}!`);
       setEmail("");
 
-      setUsers((prev) => [
-        ...prev,
-        { id: Date.now(), email, role: "admin", status: "pending" },
-      ]);
+      // Re-fetch instead of guessing a local row — the invited admin now
+      // exists as a real (unconfirmed) Supabase user with a real id, which
+      // we need in hand for "remove" to work later.
+      loadUsers();
     } catch (err) {
       console.error("Error inviting user:", err.message);
       setError(err.message);
     }
   };
 
-  const removeUser = (id) => {
-    setUsers(users.filter((u) => u.id !== id));
+  // Actually revokes the admin's access (deletes the Supabase auth user),
+  // not just a local list item.
+  const removeUser = async (id) => {
+    if (!window.confirm(t.confirmRemoveAdmin || "Remove this admin's access? This cannot be undone.")) {
+      return;
+    }
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin-users/${id}`, {
+        method: "DELETE",
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.detail || "Failed to remove admin.");
+      }
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (err) {
+      console.error("Error removing admin:", err.message);
+      setError(err.message);
+    }
   };
 
   return (
@@ -241,6 +290,10 @@ export default function UsersPage({ t }) {
         <h2>
           {t.admins} <span className="count">{users.length}</span>
         </h2>
+        {usersLoading && <p style={{ color: "#999", fontSize: 13 }}>{t.loading || "Loading..."}</p>}
+        {!usersLoading && users.length === 0 && (
+          <p style={{ color: "#999", fontSize: 13 }}>{t.noAdmins || "No admins yet."}</p>
+        )}
         {users.map((u) => (
           <div key={u.id} className="question-item">
             <div className="question-item-info">
@@ -257,7 +310,7 @@ export default function UsersPage({ t }) {
                 </span>
               </span>
             </div>
-            {u.email !== "admin@ovgu.de" && (
+            {u.id !== currentUserId && (
               <button className="delete-btn" onClick={() => removeUser(u.id)}>
                 {t.remove}
               </button>

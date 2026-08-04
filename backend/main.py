@@ -120,17 +120,8 @@ async def get_score_range(project_id: int, request: Request):
         ratings=ratings
     )
 
-# Aggregates everything the Analytics dashboard needs into a single
-# response, so the frontend makes one request instead of seven.
-#
-# NOTE: these Supabase calls are made one at a time, deliberately not
-# fanned out with asyncio.gather()/asyncio.to_thread(). supabase-py's
-# client (and the httpx/HTTP-2 connection it holds) isn't safe to drive
-# concurrently from multiple threads — an earlier version of this endpoint
-# did that and it intermittently corrupted the shared HTTP/2 connection
-# (httpx.RemoteProtocolError: ConnectionTerminated), surfacing as a raw
-# 500. The win here is still real: 7 round trips from the browser become
-# 1; the backend just makes its own Supabase calls sequentially.
+# Aggregates everything the Analytics dashboard needs into a single response, so the frontend makes one request instead of seven.
+
 @app.get("/projects/{project_id}/analytics")
 async def get_project_analytics(project_id: int, request: Request):
     supabase: Client = request.app.state.supabase
@@ -178,6 +169,42 @@ async def invite_user(payload: InviteRequest, request: Request):
             options={"redirect_to": payload.redirect_to}
         )
         return {"status": "success", "data": response}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@app.get("/api/admin-users")
+async def list_admin_users(request: Request):
+    supabase: Client = request.app.state.supabase
+    try:
+        response = supabase.auth.admin.list_users()
+        # supabase-py has returned either a bare list or an object with a
+        # `.users` attribute across versions — handle both.
+        users = response if isinstance(response, list) else getattr(response, "users", [])
+        return {
+            "users": [
+                {
+                    "id": u.id,
+                    "email": u.email,
+                    "status": "active" if getattr(u, "email_confirmed_at", None) else "pending",
+                }
+                for u in users
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@app.delete("/api/admin-users/{user_id}")
+async def delete_admin_user(user_id: str, request: Request):
+    supabase: Client = request.app.state.supabase
+    try:
+        supabase.auth.admin.delete_user(user_id)
+        return {"status": "success"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

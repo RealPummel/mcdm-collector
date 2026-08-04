@@ -97,3 +97,52 @@ def test_get_project_analytics(client, mock_supabase):
     assert body["weighted_sums"] == {"1": {"10": 6.0}}
     assert body["alternative_score_avg"] == {"10": 4.2}
     assert body["weight_avg"] == {"1": 3.1}
+
+
+def test_invite_user_success(client, mock_supabase):
+    mock_supabase.auth.admin.invite_user_by_email.return_value = {"user": {"id": "abc"}}
+
+    response = client.post("/api/invite-user", json={"email": "new-admin@example.com"})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+
+
+def test_invite_user_failure_returns_400(client, mock_supabase):
+    mock_supabase.auth.admin.invite_user_by_email.side_effect = Exception("email rejected")
+
+    response = client.post("/api/invite-user", json={"email": "new-admin@example.com"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "email rejected"
+
+
+def test_list_admin_users(client, mock_supabase):
+    class FakeUser:
+        def __init__(self, id, email, confirmed_at):
+            self.id = id
+            self.email = email
+            self.email_confirmed_at = confirmed_at
+
+    mock_supabase.auth.admin.list_users.return_value = [
+        FakeUser("1", "active@example.com", "2024-01-01T00:00:00Z"),
+        FakeUser("2", "pending@example.com", None),
+    ]
+
+    response = client.get("/api/admin-users")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "users": [
+            {"id": "1", "email": "active@example.com", "status": "active"},
+            {"id": "2", "email": "pending@example.com", "status": "pending"},
+        ]
+    }
+
+
+def test_delete_admin_user(client, mock_supabase):
+    response = client.delete("/api/admin-users/abc123")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "success"}
+    mock_supabase.auth.admin.delete_user.assert_called_with("abc123")

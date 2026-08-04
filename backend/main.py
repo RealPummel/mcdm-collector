@@ -10,6 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
+# Max number of ids accepted in list-style query params (?criterion_id=1&criterion_id=2&...)
+# to keep a single request from forcing an unbounded RPC call.
+MAX_ID_FILTER_LENGTH = 200
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     SUPABASE_URL: str = os.getenv("SUPABASE_URL")
@@ -23,9 +27,6 @@ app = FastAPI(lifespan=lifespan)
 
 # Comma-separated list of allowed frontend origins, e.g.
 #   CORS_ALLOWED_ORIGINS=http://localhost:5173,https://my-app.example.com
-# Falls back to local dev only. Note: browsers send Origin without a
-# trailing slash, so entries here must not have one either or they will
-# never match.
 _allowed_origins = [
     origin.strip()
     for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
@@ -39,6 +40,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _check_id_filter_length(ids: Optional[List[int]]):
+    if ids and len(ids) > MAX_ID_FILTER_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Too many ids in filter (max {MAX_ID_FILTER_LENGTH}).",
+        )
 
 @app.get("/projects/{project_id}/alternatives")
 async def get_alternatives(project_id: int, request: Request):
@@ -60,17 +69,19 @@ async def get_weights(project_id: int, request: Request):
 @app.get("/projects/{project_id}/weights/avg")
 async def get_weights_avg(project_id: int, request: Request, criterion_id: Optional[List[int]] = Query(None)):
     supabase: Client = request.app.state.supabase
+    _check_id_filter_length(criterion_id)
     if criterion_id:
         return {"weight_avg": supabase.rpc("get_weight_avg_by_criterion", {"p_id": project_id, "c_id": criterion_id}).execute().data}
-    
+
     return {"weight_avg": supabase.rpc("get_weight_avg_by_project", {"p_id": project_id}).execute().data}
-    
+
 @app.get("/projects/{project_id}/alternatives/score/avg")
 async def get_alternative_avg_score(project_id: int, request: Request, alternative_id: Optional[List[int]] = Query(None)):
     supabase: Client = request.app.state.supabase
+    _check_id_filter_length(alternative_id)
     if alternative_id:
         return {"alternative_score_avg": supabase.rpc("get_user_score_avg_by_alternative", {"p_id": project_id, "a_id": alternative_id}).execute().data}
-    
+
     return {"alternative_score_avg": supabase.rpc("get_user_score_avg_by_project", {"p_id": project_id}).execute().data}
 
 @app.get("/projects/{project_id}")

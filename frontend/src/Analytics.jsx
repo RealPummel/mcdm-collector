@@ -666,7 +666,7 @@ export default function Analytics({ surveys, t = {} }) {
     kpiCompletion: t.kpiCompletion || "Abschlussrate",
     kpiTop: t.kpiTop || "Top-Alternative",
     noData: t.noDataForSurvey || "Keine Daten fuer diese Umfrage.",
-    exportCsv: t.analyticsExportCsv || "CSV exportieren",
+    exportCsv: t.analyticsExportCsv || "CSV export",
     loadingData: t.analyticsLoading || t.loading || "Daten werden geladen...",
     colName: t.analyticsColName || "Name",
     colQuestion: t.analyticsColQuestion || "Frage",

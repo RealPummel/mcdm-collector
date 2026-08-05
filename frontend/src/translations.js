@@ -3,6 +3,9 @@ export const translations = {
     // Admin
     adminTitle: "Create Survey",
     adminSubtitle: "Create questions and configure the survey",
+    loginSubtitle: "Sign in to manage your surveys",
+    registerPrompt: "Have you been invited as an admin?",
+    registerLink: "Register",
     surveyName: "Survey Name",
     surveyNamePlaceholder: "e.g. Restaurant Review March 2025",
     description: "Description",
@@ -68,7 +71,7 @@ export const translations = {
     userManagement: "User Management",
     manageAdmins: "Manage admin access",
     inviteAdmin: "Invite Admin",
-    inviteHint: "Later this will send an email invitation via Supabase",
+    inviteHint: "Send an admin-invite via E-Mail",
     admins: "Admins",
     remove: "Remove",
     userExists: "User already exists",
@@ -151,12 +154,16 @@ export const translations = {
     kpiTop: "Top alternative",
     placeholderNote: "Sample data – will be replaced by real results later.",
     noDataForSurvey: "No data for this survey.",
+    analyticsExportCsv: "CSV export",
   },
 
   de: {
     // Admin
     adminTitle: "Umfrage erstellen",
     adminSubtitle: "Erstelle Fragen und konfiguriere die Umfrage",
+    loginSubtitle: "Melde dich an um Umfragen zu erstellen und verwalten",
+    registerPrompt: "Wurdest du als Admin eingeladen?",
+    registerLink: "Registrieren",
     surveyName: "Umfrage-Name",
     surveyNamePlaceholder: "z.B. Restaurant-Bewertung März 2025",
     description: "Beschreibung",
@@ -223,7 +230,7 @@ export const translations = {
     userManagement: "Benutzerverwaltung",
     manageAdmins: "Admin-Zugriff verwalten",
     inviteAdmin: "Admin einladen",
-    inviteHint: "Später wird eine E-Mail-Einladung über Supabase gesendet",
+    inviteHint: "Sendet eine Admin-Einladung per E-Mail",
     admins: "Admins",
     remove: "Entfernen",
     userExists: "Benutzer existiert bereits",
@@ -307,5 +314,6 @@ export const translations = {
     placeholderNote:
       "Beispieldaten – werden später durch echte Auswertung ersetzt.",
     noDataForSurvey: "Keine Daten für diese Umfrage.",
+    analyticsExportCsv: "CSV exportieren",
   },
 };

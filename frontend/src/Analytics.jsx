@@ -374,8 +374,8 @@ function UncertaintyTable({ data, emptyText, labels }) {
           >
             <strong style={{ fontSize: 15 }}>{alt.name}</strong>
             <span style={{ color: "#666", fontSize: 12 }}>
-              {labels.min}: {alt.min} · {labels.max}: {alt.max} ·{" "}
-              {labels.span}: {alt.span}
+              {labels.min}: {alt.min} · {labels.max}: {alt.max} · {labels.span}:{" "}
+              {alt.span}
             </span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -396,7 +396,8 @@ function UncertaintyTable({ data, emptyText, labels }) {
                   >
                     <span>{c.name}</span>
                     <span style={{ fontWeight: "bold", color: MAROON }}>
-                      {c.spanBefore} {"\u2192"} {c.spanAfter} (-{c.reduction}, {pct}%)
+                      {c.spanBefore} {"\u2192"} {c.spanAfter} (-{c.reduction},{" "}
+                      {pct}%)
                     </span>
                   </div>
                   <div
@@ -853,7 +854,14 @@ export default function Analytics({ surveys, t = {} }) {
       default:
         return {
           rows: data.ranking,
-          max: 100,
+          // Kein fixer Maximalwert: der Score ist eine über alle Entscheider
+          // aufsummierte Gewichtung × Bewertung und hat keine feste Obergrenze
+          // (hängt von Anzahl Kriterien, Entscheidern und der pro Kriterium
+          // konfigurierbaren Gewichtungs-Skala ab). BarChart normalisiert bei
+          // max: null selbst relativ zum größten vorhandenen Wert (wie bei
+          // "weights"), sonst wären die Balken bei kleinen Scores winzig oder
+          // liefen bei großen Scores über 100% hinaus.
+          max: null,
           unit: "",
           valueLabel: tx.valueLabelScore,
         };
@@ -964,8 +972,8 @@ export default function Analytics({ surveys, t = {} }) {
                 { key: "ranking", label: tx.metricRanking },
                 { key: "criteria", label: tx.metricCriteria },
                 { key: "weights", label: tx.metricWeights },
-                { key: "rawdata", label: tx.metricRawData },
                 { key: "uncertainty", label: tx.metricUncertainty },
+                { key: "rawdata", label: tx.metricRawData },
               ].map((m) => (
                 <button
                   key={m.key}

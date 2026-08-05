@@ -52,6 +52,7 @@ export default function App() {
   // ── ALLE Hooks zuerst, ohne return dazwischen ──
   const [lang, setLang] = useState("de");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [activePage, setActivePage] = useState("admin");
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [showRegister, setShowRegister] = useState(isInviteLink);
@@ -63,13 +64,15 @@ export default function App() {
   const t = translations[lang];
 
   const loadSurveys = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     const [{ data: projects }, { data: submitted }] = await Promise.all([
       supabase
         .from("projects")
-        .select("*, criteria(count)")
+        .select("*, criteria(id, label, max_value), alternatives(name)")
         .eq("admin_id", user.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -90,18 +93,39 @@ export default function App() {
         description: p.description,
         primaryColor: "#7a003f",
         bgImage: null,
-        questions: Array(p.criteria[0]?.count ?? 0).fill(null),
+        questions: (p.criteria || []).map((c) => ({
+          id: c.id,
+          title: c.label,
+          weightScaleMax: c.max_value,
+          rows: (p.alternatives || []).map((a) => a.name),
+        })),
         status: "draft",
         responses: submittedCount(p.id),
         createdAt: new Date(p.created_at).getTime(),
         updatedAt: new Date(p.created_at).getTime(),
-      }))
+      })),
     );
   };
 
   useEffect(() => {
     if (isLoggedIn) loadSurveys();
   }, [isLoggedIn]);
+
+  // Check Session to let user stay logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setIsLoggedIn(!!data.session);
+      setAuthChecked(true);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setIsLoggedIn(!!session);
+      },
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   const handleSave = (questions, name, color, desc, bg) => {
     setEditor(null);
@@ -134,7 +158,9 @@ export default function App() {
 
   const handleSetStatus = (id, status) =>
     setSurveys((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status, updatedAt: Date.now() } : s))
+      prev.map((s) =>
+        s.id === id ? { ...s, status, updatedAt: Date.now() } : s,
+      ),
     );
 
   // ── Respondent mode: show survey via token link (nach den Hooks!) ──
@@ -162,6 +188,9 @@ export default function App() {
         />
       </>
     );
+  }
+  if (!authChecked) {
+    return null;
   }
 
   // ── Not logged in → show login page ──
@@ -220,24 +249,33 @@ export default function App() {
       <div className="top-bar">
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            className={activePage === "admin" ? "nav-tab nav-tab-active" : "nav-tab"}
+            className={
+              activePage === "admin" ? "nav-tab nav-tab-active" : "nav-tab"
+            }
             onClick={() => setActivePage("admin")}
           >
             {t.surveysTab}
           </button>
           <button
-            className={activePage === "analytics" ? "nav-tab nav-tab-active" : "nav-tab"}
+            className={
+              activePage === "analytics" ? "nav-tab nav-tab-active" : "nav-tab"
+            }
             onClick={() => setActivePage("analytics")}
           >
             {t.analyticsTab || "Auswertung"}
           </button>
           <button
-            className={activePage === "users" ? "nav-tab nav-tab-active" : "nav-tab"}
+            className={
+              activePage === "users" ? "nav-tab nav-tab-active" : "nav-tab"
+            }
             onClick={() => setActivePage("users")}
           >
             {t.usersTab}
           </button>
-          <button className="signout-btn" onClick={() => setShowSignOutConfirm(true)}>
+          <button
+            className="signout-btn"
+            onClick={() => setShowSignOutConfirm(true)}
+          >
             {t.signOut}
           </button>
         </div>

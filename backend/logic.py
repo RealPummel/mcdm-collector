@@ -43,29 +43,28 @@ def calculate_score_range(weights: Dict[int, dict], # {criterion_id: {"min": x, 
         )
         
         current_span = max_score - min_score
-        
-        # Calculate the reduction of the span if decision makers agree on criteria (via average value)
-        
+
+        # Calculate how much of the total span each criterion is responsible for.
+        #
+        # If decision makers agreed on a criterion (i.e. it were fixed to any
+        # single value instead of ranging between its min/max bounds), that
+        # criterion's own contribution interval [term_min, term_max] would
+        # collapse to a point, shrinking the total span by exactly
+        # (term_max - term_min) - independent of which value it collapses to,
+        # since that fixed value cancels out on both sides of the span.
         criterion_impact = {}
         for crit_id, bounds in criteria.items():
             crit_id_int = int(crit_id)
             if crit_id_int not in weights:
                 continue
-            
+
             w = weights[crit_id_int]
-            avg_weight = (w["min"] + w["max"]) / 2
-            avg_rating = (bounds["min"] + bounds["max"]) / 2
-            
             term_min = w["min"] * bounds["min"]
             term_max = w["max"] * bounds["max"]
-            
-            new_min = avg_weight * avg_rating + (min_score - term_min)
-            new_max = avg_weight * avg_rating + (max_score - term_max)
-            
-            new_span = new_max - new_min
-            
-            reduction = current_span - new_span
-            
+
+            reduction = term_max - term_min
+            new_span = current_span - reduction
+
             criterion_impact[crit_id_int] = {
                 "span_before": current_span,
                 "span_after": new_span,

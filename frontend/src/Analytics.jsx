@@ -20,20 +20,28 @@ const PIE_COLORS = [
   "#5a002e",
   "#9c5072",
 ];
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 // Leere Auswertung - Fallback wenn noch keine Daten vorhanden
 const EMPTY_RESULT = {
   responses: 0,
   completionRate: 0,
   ranking: [],
-  criteriaAvg: [],
+  alternativeAvg: [],
   weights: [],
+  sensitivity: [],
 };
 
 function EmptyHint({ text }) {
   return (
-    <p style={{ textAlign: "center", color: "#aaa", fontSize: 14, padding: "24px 0" }}>
+    <p
+      style={{
+        textAlign: "center",
+        color: "#aaa",
+        fontSize: 14,
+        padding: "24px 0",
+      }}
+    >
       {text}
     </p>
   );
@@ -164,15 +172,31 @@ function PieChart({ data, emptyText }) {
 }
 
 // Rohdaten-Tabelle (Fragen als Zeilen, Gewichtung als Spalte 2, Alternativen als Spalten)
-function RawDataTable({ data, criteriaList, emptyText, questionLabel, weightLabel }) {
+function RawDataTable({
+  data,
+  criteriaList,
+  emptyText,
+  questionLabel,
+  weightLabel,
+}) {
   if (!data || data.length === 0) return <EmptyHint text={emptyText} />;
 
   return (
     <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <table
+        style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}
+      >
         <thead>
           <tr style={{ background: "#f9f9f9" }}>
-            <th style={{ textAlign: "left", padding: "8px 6px", borderBottom: "2px solid #eee", minWidth: 100, fontWeight: "bold" }}>
+            <th
+              style={{
+                textAlign: "left",
+                padding: "8px 6px",
+                borderBottom: "2px solid #eee",
+                minWidth: 100,
+                fontWeight: "bold",
+              }}
+            >
               {questionLabel}
             </th>
             {/* Gewichtungen Spalte (als 2. Spalte) */}
@@ -184,7 +208,7 @@ function RawDataTable({ data, criteriaList, emptyText, questionLabel, weightLabe
                 color: "#7a003f",
                 fontWeight: "bold",
                 background: "#f0ecf0",
-                minWidth: 140
+                minWidth: 140,
               }}
             >
               {weightLabel}
@@ -199,7 +223,7 @@ function RawDataTable({ data, criteriaList, emptyText, questionLabel, weightLabe
                   borderBottom: "2px solid #eee",
                   color: "#666",
                   fontWeight: "bold",
-                  minWidth: 140
+                  minWidth: 140,
                 }}
               >
                 {alt.alternative}
@@ -211,8 +235,14 @@ function RawDataTable({ data, criteriaList, emptyText, questionLabel, weightLabe
           {criteriaList.map((crit, idx) => (
             <tr key={crit} style={{ borderBottom: "1px solid #f3f3f3" }}>
               {/* Frage-Name */}
-              <td style={{ padding: "8px 6px", fontWeight: "bold", background: "#f9f9f9" }}>
-                {crit}
+              <td
+                style={{
+                  padding: "8px 6px",
+                  fontWeight: "bold",
+                  background: "#f9f9f9",
+                }}
+              >
+                {capitalize(crit)}
               </td>
 
               {/* Gewichtungen für dieses Kriterium (als 2. Spalte) */}
@@ -224,13 +254,12 @@ function RawDataTable({ data, criteriaList, emptyText, questionLabel, weightLabe
                   color: "#7a003f",
                   fontSize: 11,
                   background: "#f0ecf0",
-                  fontWeight: "bold"
+                  fontWeight: "bold",
                 }}
               >
-                {data[0] && data[0][crit.toLowerCase()] ?
-                  "{" + data[0][crit.toLowerCase()].weights.join(",") + "}"
-                  : "-"
-                }
+                {data[0] && data[0][crit.toLowerCase()]
+                  ? "{" + data[0][crit.toLowerCase()].weights.join(",") + "}"
+                  : "-"}
               </td>
 
               {/* Jede Alternative ist eine Spalte */}
@@ -245,7 +274,7 @@ function RawDataTable({ data, criteriaList, emptyText, questionLabel, weightLabe
                       textAlign: "center",
                       fontFamily: "monospace",
                       color: "#7a003f",
-                      fontSize: 11
+                      fontSize: 11,
                     }}
                   >
                     {"{" + values.join(",") + "}"}
@@ -267,8 +296,28 @@ function DataTable({ data, valueLabel, unit = "", emptyText, nameLabel }) {
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
         <tr>
-          <th style={{ textAlign: "left", fontSize: 13, color: "#666", padding: "8px 6px", borderBottom: "2px solid #eee" }}>{nameLabel}</th>
-          <th style={{ textAlign: "right", fontSize: 13, color: "#666", padding: "8px 6px", borderBottom: "2px solid #eee" }}>{valueLabel}</th>
+          <th
+            style={{
+              textAlign: "left",
+              fontSize: 13,
+              color: "#666",
+              padding: "8px 6px",
+              borderBottom: "2px solid #eee",
+            }}
+          >
+            {nameLabel}
+          </th>
+          <th
+            style={{
+              textAlign: "right",
+              fontSize: 13,
+              color: "#666",
+              padding: "8px 6px",
+              borderBottom: "2px solid #eee",
+            }}
+          >
+            {valueLabel}
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -303,6 +352,78 @@ function DataTable({ data, valueLabel, unit = "", emptyText, nameLabel }) {
   );
 }
 
+// Sensitivitäts-Ansicht: pro Alternative Score-Spanne + Einfluss der Kriterien
+function SensitivityTable({ data, emptyText, labels }) {
+  if (!data.length) return <EmptyHint text={emptyText} />;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {data.map((alt) => (
+        <div
+          key={alt.name}
+          style={{ border: "1px solid #eee", borderRadius: 8, padding: 16 }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 10,
+            }}
+          >
+            <strong style={{ fontSize: 15 }}>{alt.name}</strong>
+            <span style={{ color: "#666", fontSize: 12 }}>
+              {labels.min}: {alt.min} · {labels.max}: {alt.max} ·{" "}
+              {labels.span}: {alt.span}
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {alt.criteria.map((c) => {
+              const pct = alt.span
+                ? Math.round((c.reduction / alt.span) * 100)
+                : 0;
+              return (
+                <div key={c.name}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: 12,
+                      color: "#444",
+                      marginBottom: 3,
+                    }}
+                  >
+                    <span>{c.name}</span>
+                    <span style={{ fontWeight: "bold", color: MAROON }}>
+                      {c.spanBefore} {"\u2192"} {c.spanAfter} (-{c.reduction}, {pct}%)
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      background: "#f0ecf0",
+                      borderRadius: 6,
+                      height: 10,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${pct}%`,
+                        height: "100%",
+                        background: MAROON,
+                        borderRadius: 6,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Loading-Spinner
 function LoadingSpinner({ text }) {
   return (
@@ -311,16 +432,32 @@ function LoadingSpinner({ text }) {
     </div>
   );
 }
+// Escaped genau eine CSV-Zelle nach RFC 4180: quoted, wenn nötig,
+// und " innerhalb der Zelle verdoppelt.
+// Macht den ersten Buchstaben groß (nur fürs Anzeigen, Lookup bleibt lowercase)
+function capitalize(str) {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
+function csvEscape(value, sep) {
+  const str = String(value ?? "");
+  if (str.includes(sep) || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
 // CSV Export für Rohdaten (Fragen als Zeilen, Gewichtung als Spalte 2, Alternativen als Spalten)
 function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
+    console.log("EXPORT rawData", rawData);
+  console.log("EXPORT criteria", criteria);
   if (!rawData || rawData.length === 0) {
     alert(tx.noRawDataAlert);
     return;
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  const filename = `${surveyName.replace(/\s+/g, '_')}_rawdata_${today}.csv`;
+  const today = new Date().toISOString().split("T")[0];
+  const filename = `${surveyName.replace(/\s+/g, "_")}_rawdata_${today}.csv`;
 
   // Semikolon als Spaltentrenner, damit die Kommas in {4,5,3,4} nicht
   // mit den Spalten kollidieren (deutsches Excel erwartet ohnehin ";").
@@ -329,29 +466,35 @@ function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
   let csvContent = "";
 
   // Header Row: Frage | Gewichtung | Alternative A | Alternative B | ...
-  const headers = [tx.colQuestion, tx.colWeight, ...rawData.map(alt => alt.alternative)];
+  const headers = [
+    tx.colQuestion,
+    tx.colWeight,
+    ...rawData.map((alt) => alt.alternative),
+  ];
   csvContent += headers.join(SEP) + "\n";
 
   // Data Rows (eine Zeile pro Frage/Kriterium)
-  criteria.forEach(crit => {
-    const row = [crit];
+  criteria.forEach((crit) => {
+    const row = [capitalize(crit)];
 
     // Gewichtungen für dieses Kriterium (2. Spalte)
     const weights = rawData[0]?.[crit.toLowerCase()]?.weights || [];
-    row.push(`{${weights.join(",")}}`);
+    row.push(csvEscape(`{${weights.join(",")}}`, SEP));
 
     // Für jede Alternative die Bewertungen
-    rawData.forEach(alt => {
+    rawData.forEach((alt) => {
       const critData = alt[crit.toLowerCase()];
       const values = critData?.values || [];
-      row.push(`{${values.join(",")}}`);
+      row.push(csvEscape(`{${values.join(",")}}`, SEP));
     });
 
     csvContent += row.join(SEP) + "\n";
   });
 
   const BOM = "\uFEFF";
-  const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob([BOM + csvContent], {
+    type: "text/csv;charset=utf-8;",
+  });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
 
@@ -368,14 +511,16 @@ function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
 // Error-Meldung
 function ErrorMessage({ message, prefix }) {
   return (
-    <div style={{
-      background: "#fee",
-      border: "1px solid #fcc",
-      borderRadius: 8,
-      padding: "12px 16px",
-      color: "#c33",
-      fontSize: 13
-    }}>
+    <div
+      style={{
+        background: "#fee",
+        border: "1px solid #fcc",
+        borderRadius: 8,
+        padding: "12px 16px",
+        color: "#c33",
+        fontSize: 13,
+      }}
+    >
       {prefix} {message}
     </div>
   );
@@ -396,64 +541,104 @@ async function fetchProjectResults(projectId) {
   try {
     // Alle nötigen Endpoints parallel abrufen
     const [
-      userScoresData,   // { user_scores: [ {alternative_id, criterion_id, value, user_id?} ] }
-      weightsData,      // [ {criterion_id, value, user_id?} ]  (Rohgewichte pro Person)
-      alternativesMap,  // { "5": "Restaurant A", ... }
-      criteriaMap,      // { "2": "Essen", ... }
-      weightedSumData,  // { weighted_sums: { dm_id: { alt_id: score } } }
-      scoresAvgData,    // { alternative_score_avg: { crit_id: value } }
-      weightsAvgData,   // { weight_avg: { crit_id: value } }
+      userScoresData, // { user_scores: [ {alternative_id, criterion_id, value, user_id?} ] }
+      weightsData, // [ {criterion_id, value, user_id?} ]  (Rohgewichte pro Person)
+      alternativesMap, // { "5": "Restaurant A", ... }
+      criteriaMap, // { "2": "Essen", ... }
+      weightedSumData, // { weighted_sums: { dm_id: { alt_id: score } } }
+      scoresAvgData, // { alternative_score_avg: { crit_id: value } }
+      weightsAvgData, // { weight_avg: { crit_id: value } }
+      scoreRangeData, // { alt_id: { min_score, max_score, span, criterion_impact: {...} } }
     ] = await Promise.all([
-      fetch(`${API_BASE_URL}/projects/${projectId}`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/weights`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/alternatives`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/criteria`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/weighted_sum`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/alternatives/score/avg`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/projects/${projectId}/weights/avg`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/projects/${projectId}`).then((r) => r.json()),
+      fetch(`${API_BASE_URL}/projects/${projectId}/weights`).then((r) =>
+        r.json(),
+      ),
+      fetch(`${API_BASE_URL}/projects/${projectId}/alternatives`).then((r) =>
+        r.json(),
+      ),
+      fetch(`${API_BASE_URL}/projects/${projectId}/criteria`).then((r) =>
+        r.json(),
+      ),
+      fetch(`${API_BASE_URL}/projects/${projectId}/weighted_sum`).then((r) =>
+        r.json(),
+      ),
+      fetch(
+        `${API_BASE_URL}/projects/${projectId}/alternatives/score/avg`,
+      ).then((r) => r.json()),
+      fetch(`${API_BASE_URL}/projects/${projectId}/weights/avg`).then((r) =>
+        r.json(),
+      ),
+      fetch(`${API_BASE_URL}/projects/${projectId}/score_range`).then((r) =>
+        r.json(),
+      ),
     ]);
 
     // Namen-Lookups (mit Fallback auf ID falls kein Name da ist)
-    const altName = (id) => (alternativesMap && alternativesMap[String(id)]) || `Alternative ${id}`;
-    const critName = (id) => (criteriaMap && criteriaMap[String(id)]) || `Criterion ${id}`;
+    const altName = (id) =>
+      (alternativesMap && alternativesMap[String(id)]) || `Alternative ${id}`;
+    const critName = (id) =>
+      (criteriaMap && criteriaMap[String(id)]) || `Criterion ${id}`;
 
-    const userScores = userScoresData?.user_scores || [];
-    const rawWeights = Array.isArray(weightsData) ? weightsData : (weightsData?.weights || []);
+    const userScoresRaw = userScoresData?.user_scores;
+    const userScores = Array.isArray(userScoresRaw) ? userScoresRaw : [];
+    const rawWeights = Array.isArray(weightsData)
+      ? weightsData
+      : weightsData?.weights || [];
 
-    // ── Anzahl Antworten (eindeutige Personen, falls user_id vorhanden) ──
-    const uniqueUsers = new Set(
-      userScores.map(s => s.user_id ?? s.dm_id ?? s.decision_maker_id).filter(v => v != null)
-    );
-    const responses = uniqueUsers.size || userScores.length;
+    // ── Anzahl Antworten ──
+    // Fall 1: Backend liefert eine flache Liste (mit user_id/dm_id) → eindeutige Personen zählen.
+    // Fall 2 (aktuell): Backend liefert { criterion_id: [wert, wert, ...] } — ein Wert pro
+    // eingereichter Antwort, für jedes Kriterium gleich viele → Array-Länge = Antwortzahl.
+    let responses;
+    if (Array.isArray(userScoresRaw)) {
+      const uniqueUsers = new Set(
+        userScores
+          .map((s) => s.user_id ?? s.dm_id ?? s.decision_maker_id)
+          .filter((v) => v != null),
+      );
+      responses = uniqueUsers.size || userScores.length;
+    } else {
+      const counts = Object.values(userScoresRaw || {}).map((arr) =>
+        Array.isArray(arr) ? arr.length : 0,
+      );
+      responses = counts.length ? Math.max(...counts) : 0;
+    }
     const completionRate = 0; // Backend liefert (noch) keine Abschlussrate
 
     // ── Ranking aus weighted_sum ──
     // Scores über alle Entscheider pro Alternative aufsummieren
     const scoreByAlt = {};
-    Object.values(weightedSumData?.weighted_sums || {}).forEach(alternatives => {
-      Object.entries(alternatives || {}).forEach(([altId, score]) => {
-        scoreByAlt[altId] = (scoreByAlt[altId] || 0) + Number(score || 0);
-      });
-    });
+    Object.values(weightedSumData?.weighted_sums || {}).forEach(
+      (alternatives) => {
+        Object.entries(alternatives || {}).forEach(([altId, score]) => {
+          scoreByAlt[altId] = (scoreByAlt[altId] || 0) + Number(score || 0);
+        });
+      },
+    );
     const ranking = Object.entries(scoreByAlt)
-      .map(([altId, score]) => ({ name: altName(altId), score: Math.round(score) }))
+      .map(([altId, score]) => ({
+        name: altName(altId),
+        score: Math.round(score),
+      }))
       .sort((a, b) => b.score - a.score);
 
-    // ── Ø-Bewertung pro Kriterium ──
-    const criteriaAvg = Object.entries(scoresAvgData?.alternative_score_avg || {})
-      .map(([critId, value]) => ({
-        name: critName(critId),
-        value: Math.round(Number(value) * 10) / 10,
+    // ── Ø-Bewertung pro Alternative ──
+    const alternativeAvg = Object.entries(
+      scoresAvgData?.alternative_score_avg || {},
+    )
+      .map(([altId, value]) => ({
+        name: altName(altId),
+        value: Math.round(value * 10) / 10,
       }))
       .sort((a, b) => b.value - a.value);
 
-    // ── Gewichtung der Kriterien (Durchschnitt, in %) ──
+    // ── Gewichtung der Kriterien (Durchschnitt, als Float-Wert) ──
     const weightAvgObj = weightsAvgData?.weight_avg || {};
-    const weightsTotal = Object.values(weightAvgObj).reduce((s, v) => s + Number(v || 0), 0) || 1;
     const weights = Object.entries(weightAvgObj)
       .map(([critId, value]) => ({
         name: critName(critId),
-        value: Math.round((Number(value) / weightsTotal) * 100),
+        value: Math.round(Number(value) * 10) / 10,
       }))
       .sort((a, b) => b.value - a.value);
 
@@ -462,15 +647,41 @@ async function fetchProjectResults(projectId) {
     //   [ { alternative: "Restaurant A",
     //       essen:   { values: [...], weights: [...] },
     //       service: { values: [...], weights: [...] } }, ... ]
-    const rawData = buildRawData(userScores, rawWeights, alternativesMap, criteriaMap, altName, critName);
+    const rawData = buildRawData(
+      userScores,
+      rawWeights,
+      alternativesMap,
+      criteriaMap,
+      altName,
+      critName,
+    );
+
+    // ── Sensitivität: wie stark tragen einzelne Kriterien zur Uneinigkeit bei ──
+    const sensitivity = Object.entries(scoreRangeData || {})
+      .map(([altId, info]) => ({
+        name: altName(altId),
+        min: info.min_score,
+        max: info.max_score,
+        span: info.span,
+        criteria: Object.entries(info.criterion_impact || {})
+          .map(([critId, impact]) => ({
+            name: critName(critId),
+            reduction: impact.reduction,
+            spanBefore: impact.span_before,
+            spanAfter: impact.span_after,
+          }))
+          .sort((a, b) => b.reduction - a.reduction),
+      }))
+      .sort((a, b) => b.span - a.span);
 
     return {
       responses,
       completionRate,
       ranking,
-      criteriaAvg,
+      alternativeAvg,
       weights,
       rawData,
+      sensitivity,
     };
   } catch (error) {
     console.error("API Error:", error);
@@ -479,18 +690,27 @@ async function fetchProjectResults(projectId) {
 }
 
 // Baut die Rohdaten-Struktur für die Tabelle aus den flachen Backend-Listen.
-function buildRawData(userScores, rawWeights, alternativesMap, criteriaMap, altName, critName) {
+function buildRawData(
+  userScores,
+  rawWeights,
+  alternativesMap,
+  criteriaMap,
+  altName,
+  critName,
+) {
   // Alle Alternativen- und Kriterien-IDs bestimmen
-  const altIds = alternativesMap && Object.keys(alternativesMap).length
-    ? Object.keys(alternativesMap)
-    : [...new Set(userScores.map(s => String(s.alternative_id)))];
-  const critIds = criteriaMap && Object.keys(criteriaMap).length
-    ? Object.keys(criteriaMap)
-    : [...new Set(userScores.map(s => String(s.criterion_id)))];
+  const altIds =
+    alternativesMap && Object.keys(alternativesMap).length
+      ? Object.keys(alternativesMap)
+      : [...new Set(userScores.map((s) => String(s.alternative_id)))];
+  const critIds =
+    criteriaMap && Object.keys(criteriaMap).length
+      ? Object.keys(criteriaMap)
+      : [...new Set(userScores.map((s) => String(s.criterion_id)))];
 
   // Bewertungen gruppieren: values[altId][critId] = [wert, wert, ...]
   const values = {};
-  userScores.forEach(s => {
+  userScores.forEach((s) => {
     const a = String(s.alternative_id);
     const c = String(s.criterion_id);
     const v = pickValue(s);
@@ -503,7 +723,7 @@ function buildRawData(userScores, rawWeights, alternativesMap, criteriaMap, altN
   // Gewichtungen gruppieren: weightsByCrit[critId] = [gewicht, gewicht, ...]
   // (eine Gewichtung pro Kriterium pro Person, unabhängig von der Alternative)
   const weightsByCrit = {};
-  (rawWeights || []).forEach(w => {
+  (rawWeights || []).forEach((w) => {
     const c = String(w.criterion_id);
     const v = pickValue(w);
     if (v == null) return;
@@ -512,9 +732,9 @@ function buildRawData(userScores, rawWeights, alternativesMap, criteriaMap, altN
   });
 
   // Zusammenbauen: pro Alternative ein Objekt, pro Kriterium ein Feld
-  return altIds.map(a => {
+  return altIds.map((a) => {
     const row = { alternative: altName(a) };
-    critIds.forEach(c => {
+    critIds.forEach((c) => {
       // Feldname = Kriteriumsname in Kleinbuchstaben (passt zur Tabelle)
       const key = critName(c).toLowerCase();
       row[key] = {
@@ -525,7 +745,6 @@ function buildRawData(userScores, rawWeights, alternativesMap, criteriaMap, altN
     return row;
   });
 }
-
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  Hauptkomponente                                                  ║
@@ -544,6 +763,10 @@ export default function Analytics({ surveys, t = {} }) {
     metricCriteria: t.metricCriteria || "Ø-Bewertung Alternativen",
     metricWeights: t.metricWeights || "Gewichtung der Kriterien",
     metricRawData: t.metricRawData || "Rohdaten",
+    metricSensitivity: t.metricSensitivity || "Sensitivität",
+    labelMin: t.analyticsLabelMin || "Min",
+    labelMax: t.analyticsLabelMax || "Max",
+    labelSpan: t.analyticsLabelSpan || "Spanne",
     chartBar: t.chartBar || "Balken",
     chartPie: t.chartPie || "Torte",
     chartTable: t.chartTable || "Tabelle",
@@ -559,10 +782,12 @@ export default function Analytics({ surveys, t = {} }) {
     valueLabelCriteria: t.analyticsValueCriteria || "Ø (0-5)",
     valueLabelWeight: t.analyticsValueWeight || "Gewicht",
     valueLabelScore: t.analyticsValueScore || "Score",
-    unnamedSurvey: t.analyticsUnnamedSurvey || t.untitled || "Unbenannte Umfrage",
+    unnamedSurvey:
+      t.analyticsUnnamedSurvey || t.untitled || "Unbenannte Umfrage",
     loadError: t.analyticsLoadError || "Fehler beim Laden der Daten",
     errorPrefix: t.errorLoadingPrefix || "❌ Fehler beim Laden der Daten:",
-    noRawDataAlert: t.analyticsNoRawDataAlert || "Keine Rohdaten zum Exportieren vorhanden!",
+    noRawDataAlert:
+      t.analyticsNoRawDataAlert || "Keine Rohdaten zum Exportieren vorhanden!",
   };
 
   const [surveyId, setSurveyId] = useState(() => surveyList[0]?.id || null);
@@ -595,25 +820,50 @@ export default function Analytics({ surveys, t = {} }) {
   const current = useMemo(() => {
     switch (metric) {
       case "criteria":
-        return { rows: data.criteriaAvg, max: 5, unit: "", valueLabel: tx.valueLabelCriteria };
+        return {
+          rows: data.alternativeAvg,
+          max: 5,
+          unit: "",
+          valueLabel: tx.valueLabelCriteria,
+        };
       case "weights":
-        return { rows: data.weights, max: null, unit: "%", valueLabel: tx.valueLabelWeight };
+        return {
+          rows: data.weights,
+          max: null,
+          unit: "",
+          valueLabel: tx.valueLabelWeight,
+        };
       case "rawdata": {
         // Kriterium-Namen: bevorzugt aus den Rohdaten-Feldern (behält Reihenfolge),
-        // sonst aus criteriaAvg als Fallback.
+        // sonst aus alternativeAvg als Fallback.
         let criteria;
         if (data.rawData && data.rawData.length > 0) {
-          criteria = Object.keys(data.rawData[0]).filter(k => k !== "alternative");
+          criteria = Object.keys(data.rawData[0]).filter(
+            (k) => k !== "alternative",
+          );
         } else {
-          criteria = data.criteriaAvg?.map(c => c.name) || [];
+          criteria = data.alternativeAvg?.map((c) => c.name) || [];
         }
         return { rawData: data.rawData || [], criteria, type: "rawdata" };
       }
+      case "sensitivity":
+        return { sensitivityRows: data.sensitivity || [], type: "sensitivity" };
       case "ranking":
       default:
-        return { rows: data.ranking, max: 100, unit: "", valueLabel: tx.valueLabelScore };
+        return {
+          rows: data.ranking,
+          max: 100,
+          unit: "",
+          valueLabel: tx.valueLabelScore,
+        };
     }
-  }, [metric, data, tx.valueLabelCriteria, tx.valueLabelWeight, tx.valueLabelScore]);
+  }, [
+    metric,
+    data,
+    tx.valueLabelCriteria,
+    tx.valueLabelWeight,
+    tx.valueLabelScore,
+  ]);
 
   const topAlternative = data.ranking?.[0]?.name || "-";
 
@@ -628,10 +878,13 @@ export default function Analytics({ surveys, t = {} }) {
           className="admin-btn"
           style={{ marginLeft: "auto", alignSelf: "flex-start" }}
           onClick={() => {
-            const currentSurvey = surveyList.find(s => String(s.id) === String(surveyId));
+            const currentSurvey = surveyList.find(
+              (s) => String(s.id) === String(surveyId),
+            );
             const surveyName = currentSurvey?.name || tx.unnamedSurvey;
-            const criteria = data.criteriaAvg?.map(c => c.name) ||
-                           Object.keys(data.rawData?.[0] || {}).filter(k => k !== "alternative");
+           const criteria = Object.keys(data.rawData?.[0] || {}).filter(
+  (k) => k !== "alternative"
+);
             exportRawDataToCSV(data.rawData, criteria, surveyName, tx);
           }}
         >
@@ -664,7 +917,9 @@ export default function Analytics({ surveys, t = {} }) {
             onChange={(e) => setSurveyId(e.target.value)}
           >
             {surveyList.map((s) => (
-              <option key={s.id} value={s.id}>{s.name || tx.unnamedSurvey}</option>
+              <option key={s.id} value={s.id}>
+                {s.name || tx.unnamedSurvey}
+              </option>
             ))}
           </select>
         </div>
@@ -709,6 +964,7 @@ export default function Analytics({ surveys, t = {} }) {
                 { key: "criteria", label: tx.metricCriteria },
                 { key: "weights", label: tx.metricWeights },
                 { key: "rawdata", label: tx.metricRawData },
+                { key: "sensitivity", label: tx.metricSensitivity },
               ].map((m) => (
                 <button
                   key={m.key}
@@ -724,23 +980,25 @@ export default function Analytics({ surveys, t = {} }) {
               ))}
             </div>
             <div className="dash-filters">
-              {metric !== "rawdata" && [
-                { key: "bar", label: tx.chartBar },
-                { key: "pie", label: tx.chartPie },
-                { key: "table", label: tx.chartTable },
-              ].map((c) => (
-                <button
-                  key={c.key}
-                  className={
-                    chartType === c.key
-                      ? "dash-chip dash-chip-active"
-                      : "dash-chip"
-                  }
-                  onClick={() => setChartType(c.key)}
-                >
-                  {c.label}
-                </button>
-              ))}
+              {metric !== "rawdata" &&
+                metric !== "sensitivity" &&
+                [
+                  { key: "bar", label: tx.chartBar },
+                  { key: "pie", label: tx.chartPie },
+                  { key: "table", label: tx.chartTable },
+                ].map((c) => (
+                  <button
+                    key={c.key}
+                    className={
+                      chartType === c.key
+                        ? "dash-chip dash-chip-active"
+                        : "dash-chip"
+                    }
+                    onClick={() => setChartType(c.key)}
+                  >
+                    {c.label}
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -754,12 +1012,39 @@ export default function Analytics({ surveys, t = {} }) {
                 questionLabel={tx.colQuestion}
                 weightLabel={tx.colWeight}
               />
+            ) : current.type === "sensitivity" ? (
+              <SensitivityTable
+                data={current.sensitivityRows}
+                emptyText={tx.noData}
+                labels={{
+                  min: tx.labelMin,
+                  max: tx.labelMax,
+                  span: tx.labelSpan,
+                }}
+              />
             ) : chartType === "bar" ? (
-              <BarChart data={current.rows} max={current.max} unit={current.unit} emptyText={tx.noData} />
+              <BarChart
+                data={current.rows}
+                max={current.max}
+                unit={current.unit}
+                emptyText={tx.noData}
+              />
             ) : chartType === "pie" ? (
-              <PieChart data={current.rows.map((d) => ({ name: d.name, value: d.value ?? d.score }))} emptyText={tx.noData} />
+              <PieChart
+                data={current.rows.map((d) => ({
+                  name: d.name,
+                  value: d.value ?? d.score,
+                }))}
+                emptyText={tx.noData}
+              />
             ) : (
-              <DataTable data={current.rows} valueLabel={current.valueLabel} unit={current.unit} emptyText={tx.noData} nameLabel={tx.colName} />
+              <DataTable
+                data={current.rows}
+                valueLabel={current.valueLabel}
+                unit={current.unit}
+                emptyText={tx.noData}
+                nameLabel={tx.colName}
+              />
             )}
           </div>
         </>

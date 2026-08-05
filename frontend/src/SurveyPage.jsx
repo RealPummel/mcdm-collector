@@ -66,8 +66,26 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
     setSubmitted(true);
   };
 
-  const currentQuestion = questions[currentIndex];
-  const progress = Math.round(((currentIndex + 1) / questions.length) * 100);
+  const currentQuestion = questions?.[currentIndex];
+  const progress = questions?.length
+    ? Math.round(((currentIndex + 1) / questions.length) * 100)
+    : 0;
+
+  // Absicherung: keine Fragen vorhanden (z.B. leere Vorschau)
+  if (!questions || questions.length === 0 || !currentQuestion) {
+    return (
+      <div className="survey-container">
+        <button onClick={onBack} style={{ background: "none", border: "none", color: primaryColor, cursor: "pointer", marginBottom: 8, fontSize: 14 }}>
+          {t.back}
+        </button>
+        <div className="survey-header" style={{ borderTopColor: primaryColor, textAlign: "center", padding: "48px 24px" }}>
+          <p style={{ color: "#666" }}>
+            {t.noQuestions || "Für diese Umfrage sind noch keine Fragen angelegt."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Anzahl Sterne aus der Frage; Standard 5, falls nicht gesetzt
   const starMax = currentQuestion?.weightScaleMax || 5;
@@ -80,6 +98,22 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
           <div style={{ fontSize: 56, marginBottom: 16, color: primaryColor }}>✓</div>
           <h1 style={{ color: primaryColor }}>{t.thankyou}</h1>
           <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>{t.saved}</p>
+          <button
+            onClick={onBack}
+            style={{
+              marginTop: 24,
+              background: primaryColor,
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "12px 28px",
+              fontSize: 15,
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            {t.backToDashboard || t.back}
+          </button>
         </div>
       </div>
     );

@@ -132,6 +132,31 @@ export default function App() {
     loadSurveys();
   };
 
+  // Lädt die echten Fragen (Kriterien + Alternativen) aus Supabase,
+  // bevor die Vorschau geöffnet wird (die Liste in `surveys` enthält
+  // nur ein Platzhalter-Array, keine echten Frage-Objekte).
+  const handlePreview = async (survey) => {
+    const [{ data: criteria }, { data: alternatives }] = await Promise.all([
+      supabase
+        .from("criteria")
+        .select("id, label, max_value")
+        .eq("project_id", survey.id),
+      supabase
+        .from("alternatives")
+        .select("name")
+        .eq("project_id", survey.id),
+    ]);
+    const rows = (alternatives || []).map((a) => a.name);
+    const questions = (criteria || []).map((c) => ({
+      id: c.id,
+      title: c.label,
+      rows,
+      labels: null,
+      weightScaleMax: c.max_value,
+    }));
+    setPreview({ ...survey, questions });
+  };
+
   const handleDelete = async (id) => {
     await supabase.from("projects").delete().eq("id", id);
     setSurveys((prev) => prev.filter((s) => s.id !== id));
@@ -316,7 +341,7 @@ export default function App() {
           lang={lang}
           onCreate={() => setEditor({ mode: "new" })}
           onEdit={(survey) => setEditor({ mode: "edit", id: survey.id })}
-          onPreview={(survey) => setPreview(survey)}
+          onPreview={handlePreview}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
           onSetStatus={handleSetStatus}

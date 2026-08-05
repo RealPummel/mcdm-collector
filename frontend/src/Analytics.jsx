@@ -30,6 +30,7 @@ const EMPTY_RESULT = {
   ranking: [],
   alternativeAvg: [],
   weights: [],
+  uncertainty: [],
 };
 
 function EmptyHint({ text }) {
@@ -242,7 +243,7 @@ function RawDataTable({
                   background: "#f9f9f9",
                 }}
               >
-                {crit}
+                {capitalize(crit)}
               </td>
 
               {/* Gewichtungen für dieses Kriterium (als 2. Spalte) */}
@@ -352,6 +353,79 @@ function DataTable({ data, valueLabel, unit = "", emptyText, nameLabel }) {
   );
 }
 
+// Unsicherheitsspanne: pro Alternative die mögliche Score-Spanne (min–max über alle
+// Entscheider-Eingaben) + wie stark einzelne Kriterien zu dieser Spanne beitragen
+function UncertaintyTable({ data, emptyText, labels }) {
+  if (!data.length) return <EmptyHint text={emptyText} />;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {data.map((alt) => (
+        <div
+          key={alt.name}
+          style={{ border: "1px solid #eee", borderRadius: 8, padding: 16 }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 10,
+            }}
+          >
+            <strong style={{ fontSize: 15 }}>{alt.name}</strong>
+            <span style={{ color: "#666", fontSize: 12 }}>
+              {labels.min}: {alt.min} · {labels.max}: {alt.max} ·{" "}
+              {labels.span}: {alt.span}
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {alt.criteria.map((c) => {
+              const pct = alt.span
+                ? Math.round((c.reduction / alt.span) * 100)
+                : 0;
+              return (
+                <div key={c.name}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: 12,
+                      color: "#444",
+                      marginBottom: 3,
+                    }}
+                  >
+                    <span>{c.name}</span>
+                    <span style={{ fontWeight: "bold", color: MAROON }}>
+                      {c.spanBefore} {"\u2192"} {c.spanAfter} (-{c.reduction}, {pct}%)
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      background: "#f0ecf0",
+                      borderRadius: 6,
+                      height: 10,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${pct}%`,
+                        height: "100%",
+                        background: MAROON,
+                        borderRadius: 6,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Loading-Spinner
 function LoadingSpinner({ text }) {
   return (
@@ -360,7 +434,19 @@ function LoadingSpinner({ text }) {
     </div>
   );
 }
-//---------neu
+// Macht den ersten Buchstaben groß (nur fürs Anzeigen, Lookup bleibt lowercase)
+function capitalize(str) {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Rundet auf eine Nachkommastelle für die Anzeige (gleiche Konvention wie
+// die anderen Metriken, z.B. alternativeAvg / weights)
+function round1(value) {
+  if (value == null || Number.isNaN(value)) return value;
+  return Math.round(Number(value) * 10) / 10;
+}
+
 // Escaped genau eine CSV-Zelle nach RFC 4180: quoted, wenn nötig,
 // und " innerhalb der Zelle verdoppelt.
 function csvEscape(value, sep) {
@@ -375,7 +461,6 @@ function csvEscape(value, sep) {
   }
   return str;
 }
-//---------
 // CSV Export für Rohdaten (Fragen als Zeilen, Gewichtung als Spalte 2, Alternativen als Spalten)
 function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
   if (!rawData || rawData.length === 0) {
@@ -402,7 +487,7 @@ function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
 
   // Data Rows (eine Zeile pro Frage/Kriterium)
   criteria.forEach((crit) => {
-    const row = [crit];
+    const row = [capitalize(crit)];
 
     // Gewichtungen für dieses Kriterium (2. Spalte)
     const weights = rawData[0]?.[crit.toLowerCase()]?.weights || [];
@@ -481,6 +566,7 @@ async function fetchProjectResults(projectId) {
       alternative_score_avg: analytics?.alternative_score_avg,
     }; // { alternative_score_avg: { crit_id: value } }
     const weightsAvgData = { weight_avg: analytics?.weight_avg }; // { weight_avg: { crit_id: value } }
+    const scoreRangeData = analytics?.score_range; // { alt_id: { min_score, max_score, span, criterion_impact: {...} } }
 
     // Namen-Lookups (mit Fallback auf ID falls kein Name da ist)
     const altName = (id) =>
@@ -571,6 +657,24 @@ async function fetchProjectResults(projectId) {
       critName,
     );
 
+    // ── Unsicherheitsspanne: wie stark tragen einzelne Kriterien zur Uneinigkeit bei ──
+    const uncertainty = Object.entries(scoreRangeData || {})
+      .map(([altId, info]) => ({
+        name: altName(altId),
+        min: round1(info.min_score),
+        max: round1(info.max_score),
+        span: round1(info.span),
+        criteria: Object.entries(info.criterion_impact || {})
+          .map(([critId, impact]) => ({
+            name: critName(critId),
+            reduction: round1(impact.reduction),
+            spanBefore: round1(impact.span_before),
+            spanAfter: round1(impact.span_after),
+          }))
+          .sort((a, b) => b.reduction - a.reduction),
+      }))
+      .sort((a, b) => b.span - a.span);
+
     return {
       responses,
       completionRate,
@@ -578,6 +682,7 @@ async function fetchProjectResults(projectId) {
       alternativeAvg,
       weights,
       rawData,
+      uncertainty,
     };
   } catch (error) {
     console.error("API Error:", error);
@@ -659,6 +764,10 @@ export default function Analytics({ surveys, t = {} }) {
     metricCriteria: t.metricCriteria || "Ø-Bewertung Alternativen",
     metricWeights: t.metricWeights || "Gewichtung der Kriterien",
     metricRawData: t.metricRawData || "Rohdaten",
+    metricUncertainty: t.metricUncertainty || "Unsicherheitsspanne",
+    labelMin: t.analyticsLabelMin || "Min",
+    labelMax: t.analyticsLabelMax || "Max",
+    labelSpan: t.analyticsLabelSpan || "Spanne",
     chartBar: t.chartBar || "Balken",
     chartPie: t.chartPie || "Torte",
     chartTable: t.chartTable || "Tabelle",
@@ -738,6 +847,8 @@ export default function Analytics({ surveys, t = {} }) {
         }
         return { rawData: data.rawData || [], criteria, type: "rawdata" };
       }
+      case "uncertainty":
+        return { uncertaintyRows: data.uncertainty || [], type: "uncertainty" };
       case "ranking":
       default:
         return {
@@ -854,6 +965,7 @@ export default function Analytics({ surveys, t = {} }) {
                 { key: "criteria", label: tx.metricCriteria },
                 { key: "weights", label: tx.metricWeights },
                 { key: "rawdata", label: tx.metricRawData },
+                { key: "uncertainty", label: tx.metricUncertainty },
               ].map((m) => (
                 <button
                   key={m.key}
@@ -870,6 +982,7 @@ export default function Analytics({ surveys, t = {} }) {
             </div>
             <div className="dash-filters">
               {metric !== "rawdata" &&
+                metric !== "uncertainty" &&
                 [
                   { key: "bar", label: tx.chartBar },
                   { key: "pie", label: tx.chartPie },
@@ -899,6 +1012,16 @@ export default function Analytics({ surveys, t = {} }) {
                 emptyText={tx.noData}
                 questionLabel={tx.colQuestion}
                 weightLabel={tx.colWeight}
+              />
+            ) : current.type === "uncertainty" ? (
+              <UncertaintyTable
+                data={current.uncertaintyRows}
+                emptyText={tx.noData}
+                labels={{
+                  min: tx.labelMin,
+                  max: tx.labelMax,
+                  span: tx.labelSpan,
+                }}
               />
             ) : chartType === "bar" ? (
               <BarChart

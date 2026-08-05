@@ -36,6 +36,7 @@ _allowed_origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
+    allow_origin_regex=r"https://.*\.app\.github\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -165,6 +166,14 @@ async def get_project_analytics(project_id: int, request: Request, user=Depends(
     weight_avg = _rpc("get_weight_avg_by_project", {"p_id": project_id})
     decision_maker_rows = _table("decision_makers", "id, is_submitted")
 
+    min_max_data = _rpc("get_min_and_max_inputs_by_project", {"p_id": project_id}) or {}
+    score_range_weights = min_max_data.get("weights") or {}
+    score_range_ratings = min_max_data.get("ratings") or {}
+    score_range = calculate_score_range(
+        weights={int(crit_id): value for crit_id, value in score_range_weights.items()},
+        ratings=score_range_ratings,
+    )
+
     return {
         "user_scores": user_scores,
         "weights": weights,
@@ -173,6 +182,7 @@ async def get_project_analytics(project_id: int, request: Request, user=Depends(
         "weighted_sums": _weighted_sums_by_dm(dm_inputs or {}),
         "alternative_score_avg": alternative_score_avg,
         "weight_avg": weight_avg,
+        "score_range": score_range,
         "decision_makers": {
             "total": len(decision_maker_rows or []),
             "submitted": sum(1 for r in (decision_maker_rows or []) if r.get("is_submitted")),

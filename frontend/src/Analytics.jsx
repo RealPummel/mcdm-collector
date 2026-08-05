@@ -521,6 +521,41 @@ function exportRawDataToCSV(rawData, criteria, surveyName = "survey", tx) {
   URL.revokeObjectURL(url);
 }
 
+const METRIC_EXPORT_KEYS = {
+  ranking: "ranking",
+  criteria: "alternativeAvg",
+  weights: "weights",
+  rawdata: "rawData",
+  uncertainty: "uncertainty",
+};
+
+function exportMetricToJSON(metric, data, surveyName = "survey", tx) {
+  const dataKey = METRIC_EXPORT_KEYS[metric] || "ranking";
+  const payload = data[dataKey];
+
+  if (!payload || payload.length === 0) {
+    alert(tx.noDataAlert);
+    return;
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+  const filename = `${surveyName.replace(/\s+/g, "_")}_${metric}_${today}.json`;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json;charset=utf-8;",
+  });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 // Error-Meldung
 function ErrorMessage({ message, prefix }) {
   return (
@@ -777,6 +812,7 @@ export default function Analytics({ surveys, t = {} }) {
     kpiTop: t.kpiTop || "Top-Alternative",
     noData: t.noDataForSurvey || "Keine Daten fuer diese Umfrage.",
     exportCsv: t.analyticsExportCsv || "CSV export",
+    exportJson: t.analyticsExportJson || "JSON export",
     loadingData: t.analyticsLoading || t.loading || "Daten werden geladen...",
     colName: t.analyticsColName || "Name",
     colQuestion: t.analyticsColQuestion || "Frage",
@@ -790,6 +826,8 @@ export default function Analytics({ surveys, t = {} }) {
     errorPrefix: t.errorLoadingPrefix || "❌ Fehler beim Laden der Daten:",
     noRawDataAlert:
       t.analyticsNoRawDataAlert || "Keine Rohdaten zum Exportieren vorhanden!",
+    noDataAlert:
+      t.analyticsNoDataAlert || "Keine Daten zum Exportieren vorhanden!",
   };
 
   const [surveyId, setSurveyId] = useState(() => surveyList[0]?.id || null);
@@ -883,22 +921,42 @@ export default function Analytics({ surveys, t = {} }) {
           <h1 className="dash-title">{tx.analyticsTitle}</h1>
           <p className="dash-sub">{tx.analyticsSubtitle}</p>
         </div>
-        <button
-          className="admin-btn"
-          style={{ marginLeft: "auto", alignSelf: "flex-start" }}
-          onClick={() => {
-            const currentSurvey = surveyList.find(
-              (s) => String(s.id) === String(surveyId),
-            );
-            const surveyName = currentSurvey?.name || tx.unnamedSurvey;
-            const criteria = Object.keys(data.rawData?.[0] || {}).filter(
-              (k) => k !== "alternative",
-            );
-            exportRawDataToCSV(data.rawData, criteria, surveyName, tx);
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginLeft: "auto",
+            alignSelf: "flex-start",
           }}
         >
-          {tx.exportCsv}
-        </button>
+          <button
+            className="admin-btn"
+            onClick={() => {
+              const currentSurvey = surveyList.find(
+                (s) => String(s.id) === String(surveyId),
+              );
+              const surveyName = currentSurvey?.name || tx.unnamedSurvey;
+              const criteria = Object.keys(data.rawData?.[0] || {}).filter(
+                (k) => k !== "alternative",
+              );
+              exportRawDataToCSV(data.rawData, criteria, surveyName, tx);
+            }}
+          >
+            {tx.exportCsv}
+          </button>
+          <button
+            className="admin-btn"
+            onClick={() => {
+              const currentSurvey = surveyList.find(
+                (s) => String(s.id) === String(surveyId),
+              );
+              const surveyName = currentSurvey?.name || tx.unnamedSurvey;
+              exportMetricToJSON(metric, data, surveyName, tx);
+            }}
+          >
+            {tx.exportJson}
+          </button>
+        </div>
       </header>
 
       {/* Umfrage-Auswahl (Dropdown) */}

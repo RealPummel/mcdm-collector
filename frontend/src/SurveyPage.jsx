@@ -7,7 +7,12 @@ function StarRating({ value, onChange, max = 5, color = "#7a003f" }) {
     <div
       role="radiogroup"
       aria-label="Gewichtung"
-      style={{ display: "flex", gap: 6, marginTop: 8 }}
+      style={{
+        display: "flex",
+        gap: 6,
+        marginTop: 8,
+        justifyContent: "center",
+      }}
     >
       {Array.from({ length: max }, (_, i) => i + 1).map((star) => {
         const active = star <= (hover || value);
@@ -41,8 +46,15 @@ function StarRating({ value, onChange, max = 5, color = "#7a003f" }) {
   );
 }
 
-export default function SurveyPage({ questions, surveyName, primaryColor, description, bgImage, onBack, t }) {
-
+export default function SurveyPage({
+  questions,
+  surveyName,
+  primaryColor,
+  description,
+  bgImage,
+  onBack,
+  t,
+}) {
   const [answers, setAnswers] = useState({});
   // Gewichte pro Frage (in der Vorschau anklickbar)
   const [weights, setWeights] = useState({});
@@ -50,14 +62,14 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const handleSelect = (questionId, row, value) => {
-    setAnswers(prev => ({
+    setAnswers((prev) => ({
       ...prev,
       [questionId]: { ...prev[questionId], [row]: value },
     }));
   };
 
   const handleWeight = (questionId, value) => {
-    setWeights(prev => ({ ...prev, [questionId]: value }));
+    setWeights((prev) => ({ ...prev, [questionId]: value }));
   };
 
   const handleSubmit = () => {
@@ -76,8 +88,17 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
   if (submitted) {
     return (
       <div className="survey-container">
-        <div className="survey-header" style={{ borderTopColor: primaryColor, textAlign: "center", padding: "48px 24px" }}>
-          <div style={{ fontSize: 56, marginBottom: 16, color: primaryColor }}>✓</div>
+        <div
+          className="survey-header"
+          style={{
+            borderTopColor: primaryColor,
+            textAlign: "center",
+            padding: "48px 24px",
+          }}
+        >
+          <div style={{ fontSize: 56, marginBottom: 16, color: primaryColor }}>
+            ✓
+          </div>
           <h1 style={{ color: primaryColor }}>{t.thankyou}</h1>
           <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>{t.saved}</p>
         </div>
@@ -88,35 +109,57 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
   return (
     <div
       className="survey-container"
-      style={bgImage ? {
-        backgroundImage: `url(${bgImage})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundAttachment: "fixed",
-        minHeight: "100vh",
-        padding: "20px",
-        maxWidth: "100%",
-        margin: "0 auto",
-        boxSizing: "border-box",
-      } : {}}
+      style={
+        bgImage
+          ? {
+              backgroundImage: `url(${bgImage})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundAttachment: "fixed",
+              minHeight: "100vh",
+              padding: "20px",
+              maxWidth: "100%",
+              margin: "0 auto",
+              boxSizing: "border-box",
+            }
+          : {}
+      }
     >
-
-      <button onClick={onBack} style={{ background: "none", border: "none", color: primaryColor, cursor: "pointer", marginBottom: 8, fontSize: 14 }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: "none",
+          border: "none",
+          color: primaryColor,
+          cursor: "pointer",
+          marginBottom: 8,
+          fontSize: 14,
+        }}
+      >
         {t.back}
       </button>
 
       <div className="survey-header" style={{ borderTopColor: primaryColor }}>
         <h1 style={{ color: primaryColor }}>{surveyName || "Survey"}</h1>
-        {description && <p style={{ color: "#666", margin: "8px 0 0", fontSize: 14 }}>{description}</p>}
+        {description && (
+          <p style={{ color: "#666", margin: "8px 0 0", fontSize: 14 }}>
+            {description}
+          </p>
+        )}
       </div>
 
       <div className="progress-container">
         <div className="progress-info">
-          <span>Question {currentIndex + 1} {t.questionOf} {questions.length}</span>
+          <span>
+            Question {currentIndex + 1} {t.questionOf} {questions.length}
+          </span>
           <span>{progress}%</span>
         </div>
         <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${progress}%`, background: primaryColor }} />
+          <div
+            className="progress-fill"
+            style={{ width: `${progress}%`, background: primaryColor }}
+          />
         </div>
       </div>
 
@@ -127,23 +170,29 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
           {t.weightIntro ||
             "Wähle, wie wichtig dir dieser Punkt bei deiner Entscheidung ist. Klicke auf die Sterne — 1 Stern bedeutet wenig wichtig, mehr Sterne bedeuten sehr wichtig."}
         </p>
-        <p className="legend" style={{ fontWeight: "bold", color: primaryColor }}>{currentQuestion.title}</p>
+        <p className="legend criteria">{currentQuestion.title}</p>
         <StarRating
           value={currentWeight}
           onChange={(v) => handleWeight(currentQuestion.id, v)}
           max={starMax}
           color={primaryColor}
         />
-        {/* Beschriftung an den Enden der Skala */}
-        <div style={{ display: "flex", justifyContent: "space-between", maxWidth: starMax * 36, marginTop: 4 }}>
-          <span style={{ fontSize: 12, color: "#999" }}>{t.weightLow || "weniger wichtig"}</span>
-          <span style={{ fontSize: 12, color: "#999" }}>{t.weightHigh || "sehr wichtig"}</span>
+        {/* Beschriftung an den Enden der Skala (an Sterne-Reihe ausgerichtet) */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            width: starMax * 36 - 6,
+            margin: "4px auto 0",
+          }}
+        >
+          <span style={{ fontSize: 12, color: "#999" }}>
+            {t.weightLow || "weniger wichtig"}
+          </span>
+          <span style={{ fontSize: 12, color: "#999" }}>
+            {t.weightHigh || "sehr wichtig"}
+          </span>
         </div>
-        <p className="legend" style={{ marginTop: 8 }}>
-          {currentWeight
-            ? `${t.weightChosen || "Deine Wahl"}: ${currentWeight} / ${starMax}`
-            : (t.weightHint || "Bitte wähle eine Gewichtung, indem du auf die Sterne klickst.")}
-        </p>
       </div>
 
       {/* Bewertung der Alternativen (wie bisher) */}
@@ -151,30 +200,38 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
         <h2>{currentQuestion.title}</h2>
         <p className="legend">
           {currentQuestion.labels
-            ? currentQuestion.labels.map(l => l.text).join(" | ")
+            ? currentQuestion.labels.map((l) => l.text).join(" | ")
             : t.legendDefault}
         </p>
         <table>
           <thead>
             <tr>
               <th></th>
-              {(currentQuestion.labels || [1,2,3,4,5].map(n => ({ value: n }))).map(l => (
+              {(
+                currentQuestion.labels ||
+                [1, 2, 3, 4, 5].map((n) => ({ value: n }))
+              ).map((l) => (
                 <th key={l.value}>{l.value}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {currentQuestion.rows.map(row => (
+            {currentQuestion.rows.map((row) => (
               <tr key={row}>
                 <td>{row}</td>
-                {(currentQuestion.labels || [1,2,3,4,5].map(n => ({ value: n }))).map(l => (
+                {(
+                  currentQuestion.labels ||
+                  [1, 2, 3, 4, 5].map((n) => ({ value: n }))
+                ).map((l) => (
                   <td key={l.value}>
                     <input
                       type="radio"
                       name={`${currentQuestion.id}-${row}`}
                       value={l.value}
                       checked={answers[currentQuestion.id]?.[row] === l.value}
-                      onChange={() => handleSelect(currentQuestion.id, row, l.value)}
+                      onChange={() =>
+                        handleSelect(currentQuestion.id, row, l.value)
+                      }
                     />
                   </td>
                 ))}
@@ -186,21 +243,31 @@ export default function SurveyPage({ questions, surveyName, primaryColor, descri
 
       <div className="nav-buttons">
         {currentIndex > 0 && (
-          <button className="nav-btn-back" onClick={() => setCurrentIndex(currentIndex - 1)}>
+          <button
+            className="nav-btn-back"
+            onClick={() => setCurrentIndex(currentIndex - 1)}
+          >
             ← {t.questionOf === "von" ? "Zurück" : "Back"}
           </button>
         )}
         {currentIndex < questions.length - 1 ? (
-          <button className="submit-btn" style={{ background: primaryColor }} onClick={() => setCurrentIndex(currentIndex + 1)}>
+          <button
+            className="submit-btn"
+            style={{ background: primaryColor }}
+            onClick={() => setCurrentIndex(currentIndex + 1)}
+          >
             {t.next}
           </button>
         ) : (
-          <button className="submit-btn" style={{ background: primaryColor }} onClick={handleSubmit}>
-            {t.submit}
+          <button
+            className="submit-btn"
+            style={{ background: primaryColor }}
+            onClick={onBack}
+          >
+            {t.back}
           </button>
         )}
       </div>
-
     </div>
   );
 }

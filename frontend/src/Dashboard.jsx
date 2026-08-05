@@ -81,7 +81,6 @@ export default function Dashboard({
   onCreate,
   onEdit,
   onPreview,
-  onDuplicate,
   onDelete,
   onSetStatus,
 }) {
@@ -105,17 +104,23 @@ export default function Dashboard({
     }).format(new Date(ts));
 
   const statusLabel = (status) =>
-    ({ draft: tx.statusDraft, active: tx.statusActive, closed: tx.statusClosed }[status] || status);
+    ({
+      draft: tx.statusDraft,
+      active: tx.statusActive,
+      closed: tx.statusClosed,
+    })[status] || status;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = surveys
-      .filter((s) => (statusFilter === "all" ? true : s.status === statusFilter))
+      .filter((s) =>
+        statusFilter === "all" ? true : s.status === statusFilter,
+      )
       .filter((s) =>
         q
           ? (s.name || "").toLowerCase().includes(q) ||
             (s.description || "").toLowerCase().includes(q)
-          : true
+          : true,
       );
 
     const byName = (a, b) =>
@@ -142,7 +147,7 @@ export default function Dashboard({
       active: surveys.filter((s) => s.status === "active").length,
       responses: surveys.reduce((sum, s) => sum + (s.responses || 0), 0),
     }),
-    [surveys]
+    [surveys],
   );
 
   return (
@@ -181,14 +186,29 @@ export default function Dashboard({
           onChange={(e) => setQuery(e.target.value)}
           aria-label={tx.searchPlaceholder}
         />
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <div className="dash-filters" role="tablist" aria-label={tx.filterByStatus}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            className="dash-filters"
+            role="tablist"
+            aria-label={tx.filterByStatus}
+          >
             {STATUSES.map((st) => (
               <button
                 key={st}
                 role="tab"
                 aria-selected={statusFilter === st}
-                className={statusFilter === st ? "dash-chip dash-chip-active" : "dash-chip"}
+                className={
+                  statusFilter === st
+                    ? "dash-chip dash-chip-active"
+                    : "dash-chip"
+                }
                 onClick={() => setStatusFilter(st)}
               >
                 {st === "all" ? tx.filterAll : statusLabel(st)}
@@ -240,7 +260,9 @@ export default function Dashboard({
               </div>
 
               <h2 className="dash-card-title">{s.name || tx.untitled}</h2>
-              <p className="dash-card-desc">{s.description || tx.noDescription}</p>
+              <p className="dash-card-desc">
+                {s.description || tx.noDescription}
+              </p>
 
               <div className="dash-card-meta">
                 <span>
@@ -254,7 +276,9 @@ export default function Dashboard({
 
               {confirmId === s.id ? (
                 <div className="dash-confirm">
-                  <span className="dash-confirm-text">{tx.confirmDeleteSurvey}</span>
+                  <span className="dash-confirm-text">
+                    {tx.confirmDeleteSurvey}
+                  </span>
                   <div className="dash-confirm-actions">
                     <button
                       className="dash-btn dash-btn-danger"
@@ -275,17 +299,17 @@ export default function Dashboard({
                 </div>
               ) : (
                 <div className="dash-card-actions">
-                  <button className="dash-btn dash-btn-ghost" onClick={() => onEdit(s)}>
+                  <button
+                    className="dash-btn dash-btn-ghost"
+                    onClick={() => onEdit(s)}
+                  >
                     {tx.edit}
-                  </button>
-                  <button className="dash-btn dash-btn-ghost" onClick={() => onPreview(s)}>
-                    {tx.preview}
                   </button>
                   <button
                     className="dash-btn dash-btn-ghost"
-                    onClick={() => onDuplicate(s.id)}
+                    onClick={() => onPreview(s)}
                   >
-                    {tx.duplicate}
+                    {tx.preview}
                   </button>
                   <select
                     className="dash-status-select"

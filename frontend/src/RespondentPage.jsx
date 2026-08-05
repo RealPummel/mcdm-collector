@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 
 export default function RespondentPage({ token, t }) {
-  const [status, setStatus] = useState("loading"); 
+  const [status, setStatus] = useState("loading");
   const [dm, setDm] = useState(null);
   const [project, setProject] = useState(null);
   const [criteria, setCriteria] = useState([]);
@@ -25,9 +25,18 @@ export default function RespondentPage({ token, t }) {
       .eq("token", token)
       .single();
 
-    if (dmError || !dmData) { setStatus("error"); return; }
-    if (dmData.is_submitted) { setStatus("already_done"); return; }
-    if (dmData.expires_at && new Date(dmData.expires_at) < new Date()) { setStatus("expired"); return; }
+    if (dmError || !dmData) {
+      setStatus("error");
+      return;
+    }
+    if (dmData.is_submitted) {
+      setStatus("already_done");
+      return;
+    }
+    if (dmData.expires_at && new Date(dmData.expires_at) < new Date()) {
+      setStatus("expired");
+      return;
+    }
     setDm(dmData);
 
     const { data: projectData, error: projectError } = await supabase
@@ -36,12 +45,18 @@ export default function RespondentPage({ token, t }) {
       .eq("id", dmData.project_id)
       .single();
 
-    if (projectError || !projectData) { setStatus("error"); return; }
+    if (projectError || !projectData) {
+      setStatus("error");
+      return;
+    }
     setProject(projectData);
 
     const [{ data: crit }, { data: alts }] = await Promise.all([
       supabase.from("criteria").select("*").eq("project_id", dmData.project_id),
-      supabase.from("alternatives").select("*").eq("project_id", dmData.project_id),
+      supabase
+        .from("alternatives")
+        .select("*")
+        .eq("project_id", dmData.project_id),
     ]);
 
     setCriteria(crit || []);
@@ -82,11 +97,13 @@ export default function RespondentPage({ token, t }) {
         if (ratingsError) throw ratingsError;
       }
 
-      const weightRows = Object.entries(weights).map(([criterionId, value]) => ({
-        dm_id: dm.id,
-        criterion_id: parseInt(criterionId),
-        value: parseFloat(value),
-      }));
+      const weightRows = Object.entries(weights).map(
+        ([criterionId, value]) => ({
+          dm_id: dm.id,
+          criterion_id: parseInt(criterionId),
+          value: parseFloat(value),
+        }),
+      );
 
       if (weightRows.length > 0) {
         const { error: weightsError } = await supabase
@@ -110,16 +127,32 @@ export default function RespondentPage({ token, t }) {
   };
 
   if (status === "loading") {
-    return <div className="survey-container" style={{ textAlign: "center", paddingTop: 80 }}>{t.loading}</div>;
+    return (
+      <div
+        className="survey-container"
+        style={{ textAlign: "center", paddingTop: 80 }}
+      >
+        {t.loading}
+      </div>
+    );
   }
 
   if (status === "error") {
     return (
       <div className="survey-container">
-        <div className="survey-header" style={{ borderTopColor: "#c00", textAlign: "center", padding: "48px 24px" }}>
+        <div
+          className="survey-header"
+          style={{
+            borderTopColor: "#c00",
+            textAlign: "center",
+            padding: "48px 24px",
+          }}
+        >
           <div style={{ fontSize: 56, marginBottom: 16, color: "#c00" }}>✕</div>
           <h1 style={{ color: "#c00" }}>{t.linkInvalidTitle}</h1>
-          <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>{t.linkInvalidText}</p>
+          <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>
+            {t.linkInvalidText}
+          </p>
         </div>
       </div>
     );
@@ -128,10 +161,21 @@ export default function RespondentPage({ token, t }) {
   if (status === "expired") {
     return (
       <div className="survey-container">
-        <div className="survey-header" style={{ borderTopColor: "#e67e00", textAlign: "center", padding: "48px 24px" }}>
-          <div style={{ fontSize: 56, marginBottom: 16, color: "#e67e00" }}>⏱</div>
+        <div
+          className="survey-header"
+          style={{
+            borderTopColor: "#e67e00",
+            textAlign: "center",
+            padding: "48px 24px",
+          }}
+        >
+          <div style={{ fontSize: 56, marginBottom: 16, color: "#e67e00" }}>
+            ⏱
+          </div>
           <h1 style={{ color: "#e67e00" }}>{t.linkExpiredTitle}</h1>
-          <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>{t.linkExpiredText}</p>
+          <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>
+            {t.linkExpiredText}
+          </p>
         </div>
       </div>
     );
@@ -140,10 +184,21 @@ export default function RespondentPage({ token, t }) {
   if (status === "already_done") {
     return (
       <div className="survey-container">
-        <div className="survey-header" style={{ borderTopColor: "#7a003f", textAlign: "center", padding: "48px 24px" }}>
-          <div style={{ fontSize: 56, marginBottom: 16, color: "#7a003f" }}>✓</div>
+        <div
+          className="survey-header"
+          style={{
+            borderTopColor: "#7a003f",
+            textAlign: "center",
+            padding: "48px 24px",
+          }}
+        >
+          <div style={{ fontSize: 56, marginBottom: 16, color: "#7a003f" }}>
+            ✓
+          </div>
           <h1 style={{ color: "#7a003f" }}>{t.linkAlreadyDoneTitle}</h1>
-          <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>{t.linkAlreadyDoneText}</p>
+          <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>
+            {t.linkAlreadyDoneText}
+          </p>
         </div>
       </div>
     );
@@ -152,8 +207,17 @@ export default function RespondentPage({ token, t }) {
   if (submitted) {
     return (
       <div className="survey-container">
-        <div className="survey-header" style={{ borderTopColor: "#7a003f", textAlign: "center", padding: "48px 24px" }}>
-          <div style={{ fontSize: 56, marginBottom: 16, color: "#7a003f" }}>✓</div>
+        <div
+          className="survey-header"
+          style={{
+            borderTopColor: "#7a003f",
+            textAlign: "center",
+            padding: "48px 24px",
+          }}
+        >
+          <div style={{ fontSize: 56, marginBottom: 16, color: "#7a003f" }}>
+            ✓
+          </div>
           <h1 style={{ color: "#7a003f" }}>{t.thankyou}</h1>
           <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>{t.saved}</p>
         </div>
@@ -168,27 +232,37 @@ export default function RespondentPage({ token, t }) {
   const weightScale = Array.from({ length: weightMax }, (_, i) => i + 1);
 
   const hasWeight = !!weights[currentCriterion?.id];
-  const hasAllRatings = alternatives.length > 0 &&
-    alternatives.every((alt) => answers[currentCriterion?.id]?.[alt.id] !== undefined);
+  const hasAllRatings =
+    alternatives.length > 0 &&
+    alternatives.every(
+      (alt) => answers[currentCriterion?.id]?.[alt.id] !== undefined,
+    );
   const canProceed = hasWeight && hasAllRatings;
 
   return (
     <div className="survey-container">
-
       <div className="survey-header" style={{ borderTopColor: "#7a003f" }}>
         <h1 style={{ color: "#7a003f" }}>{project?.name || "Survey"}</h1>
         {project?.description && (
-          <p style={{ color: "#666", margin: "8px 0 0", fontSize: 14 }}>{project.description}</p>
+          <p style={{ color: "#666", margin: "8px 0 0", fontSize: 14 }}>
+            {project.description}
+          </p>
         )}
       </div>
 
       <div className="progress-container">
         <div className="progress-info">
-          <span>{t.questionLabel} {currentIndex + 1} {t.questionOf} {criteria.length}</span>
+          <span>
+            {t.questionLabel} {currentIndex + 1} {t.questionOf}{" "}
+            {criteria.length}
+          </span>
           <span>{progress}%</span>
         </div>
         <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${progress}%`, background: "#7a003f" }} />
+          <div
+            className="progress-fill"
+            style={{ width: `${progress}%`, background: "#7a003f" }}
+          />
         </div>
       </div>
 
@@ -197,9 +271,25 @@ export default function RespondentPage({ token, t }) {
         <p style={{ color: "#555", fontSize: 14, margin: "0 0 4px" }}>
           {t.weightIntro}
         </p>
-        <p className="legend" style={{ fontWeight: "bold", color: "#7a003f" }}>{currentCriterion?.label}</p>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-          <div role="radiogroup" aria-label={t.weightQuestion} style={{ display: "flex", gap: 6 }}>
+        <p className="legend criteria">{currentCriterion?.label}</p>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            marginTop: 8,
+          }}
+        >
+          <div
+            role="radiogroup"
+            aria-label={t.weightQuestion}
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
             {weightScale.map((star) => {
               const currentWeight = weights[currentCriterion?.id] || 0;
               const active = star <= currentWeight;
@@ -230,11 +320,6 @@ export default function RespondentPage({ token, t }) {
             {weights[currentCriterion?.id] || 0} / {weightMax}
           </span>
         </div>
-        <p className="legend" style={{ marginTop: 8 }}>
-          {weights[currentCriterion?.id]
-            ? `${t.weightChosen}: ${weights[currentCriterion.id]} / ${weightMax}`
-            : t.weightHint}
-        </p>
       </div>
 
       <div className="question-card">
@@ -244,7 +329,9 @@ export default function RespondentPage({ token, t }) {
           <thead>
             <tr>
               <th></th>
-              {scale.map((v) => <th key={v}>{v}</th>)}
+              {scale.map((v) => (
+                <th key={v}>{v}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -258,7 +345,9 @@ export default function RespondentPage({ token, t }) {
                       name={`${currentCriterion.id}-${alt.id}`}
                       value={v}
                       checked={answers[currentCriterion.id]?.[alt.id] === v}
-                      onChange={() => handleSelect(currentCriterion.id, alt.id, v)}
+                      onChange={() =>
+                        handleSelect(currentCriterion.id, alt.id, v)
+                      }
                     />
                   </td>
                 ))}
@@ -270,7 +359,10 @@ export default function RespondentPage({ token, t }) {
 
       <div className="nav-buttons">
         {currentIndex > 0 && (
-          <button className="nav-btn-back" onClick={() => setCurrentIndex(currentIndex - 1)}>
+          <button
+            className="nav-btn-back"
+            onClick={() => setCurrentIndex(currentIndex - 1)}
+          >
             ← {t.backBtn}
           </button>
         )}
@@ -286,7 +378,7 @@ export default function RespondentPage({ token, t }) {
         ) : (
           <button
             className="submit-btn"
-            style={{ background: (saving || !canProceed) ? "#ccc" : "#7a003f" }}
+            style={{ background: saving || !canProceed ? "#ccc" : "#7a003f" }}
             onClick={handleSubmit}
             disabled={saving || !canProceed}
           >
@@ -294,7 +386,6 @@ export default function RespondentPage({ token, t }) {
           </button>
         )}
       </div>
-
     </div>
   );
 }

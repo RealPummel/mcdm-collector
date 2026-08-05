@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "./supabaseClient";
+import mcdmLogo from "./assets/MCDM_logo.png";
 
 export default function LoginPage({ onLogin, onShowRegister, t = {} }) {
   const [email, setEmail] = useState("");
@@ -31,8 +32,10 @@ export default function LoginPage({ onLogin, onShowRegister, t = {} }) {
       <div className="login-card">
         {/* Logo / Title */}
         <div className="login-header">
-          <div className="login-logo">⬡</div>
-          <h1>{t.loginTitle || "Survey Admin"}</h1>
+          <div className="login-logo">
+            <img src={mcdmLogo} alt="MCDM" />
+          </div>
+          <h1>{t.loginTitle || "Admin Login"}</h1>
           <p>{t.loginSubtitle || "Sign in to manage your surveys"}</p>
         </div>
 
@@ -68,11 +71,16 @@ export default function LoginPage({ onLogin, onShowRegister, t = {} }) {
             onClick={handleLogin}
             disabled={loading}
           >
-            {loading ? (t.loginSigningIn || "Signing in...") : (t.loginSignIn || "Sign in →")}
+            {loading
+              ? t.loginSigningIn || "Signing in..."
+              : t.loginSignIn || "Sign in →"}
           </button>
 
           {/* Registrieren-Bereich für eingeladene Admins */}
-          <div className="login-register-hint" style={{ marginTop: 16, textAlign: "center" }}>
+          <div
+            className="login-register-hint"
+            style={{ marginTop: 16, textAlign: "center" }}
+          >
             <span style={{ fontSize: 13, color: "#666" }}>
               {t.registerPrompt || "Wurdest du als Admin eingeladen?"}
             </span>

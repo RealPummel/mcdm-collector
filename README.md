@@ -22,8 +22,8 @@ Admins can create and manage surveys with custom criteria, publish them to respo
 
 ## Features
 
-- **Survey builder** — create and configure multi-criteria surveys with custom questions
-- **Admin dashboard** — manage surveys (create, edit, duplicate, delete, publish)
+- **Survey builder** — Create and configure multi-criteria surveys with custom questions
+- **Admin dashboard** — Manage surveys and view analytics
 - **REST API** — FastAPI backend with auto-generated Swagger documentation
 
 ---
@@ -86,10 +86,6 @@ The frontend will be available at **http://localhost:5173** and the backend at *
 ## Environment Variables
 
 Copy `.env.example` to `.env` and fill in your Supabase credentials:
-
-| Variable       | Example                                                               | Description                        |
-| -------------- | --------------------------------------------------------------------- | ---------------------------------- |
-| `DATABASE_URL` | `postgresql://postgres:[password]@db.[ref].supabase.co:5432/postgres` | Supabase PostgreSQL connection URL |
 
 You can find your connection string in the Supabase dashboard under **Project Settings → Database → Connection string → URI**.
 

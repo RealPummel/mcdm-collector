@@ -111,6 +111,37 @@ export default function App() {
     if (isLoggedIn) loadSurveys();
   }, [isLoggedIn]);
 
+  const applyView = (view) => {
+    setActivePage(view.activePage);
+    setEditor(view.editor ?? null);
+    setPreview(view.preview ?? null);
+    window.history.pushState(view, "");
+  };
+
+  useEffect(() => {
+    if (isLoggedIn && !editor && !preview) {
+      window.history.replaceState(
+        { activePage, editor: null, preview: null },
+        "",
+      );
+    }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    const onPopState = (e) => {
+      const view = e.state || {
+        activePage: "admin",
+        editor: null,
+        preview: null,
+      };
+      setActivePage(view.activePage || "admin");
+      setEditor(view.editor || null);
+      setPreview(view.preview || null);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   // Check Session to let user stay logged in
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -128,7 +159,7 @@ export default function App() {
   }, []);
 
   const handleSave = (questions, name, color, desc, bg) => {
-    setEditor(null);
+    applyView({ activePage: "admin", editor: null, preview: null });
     loadSurveys();
   };
 
@@ -141,10 +172,7 @@ export default function App() {
         .from("criteria")
         .select("id, label, max_value")
         .eq("project_id", survey.id),
-      supabase
-        .from("alternatives")
-        .select("name")
-        .eq("project_id", survey.id),
+      supabase.from("alternatives").select("name").eq("project_id", survey.id),
     ]);
     const rows = (alternatives || []).map((a) => a.name);
     const questions = (criteria || []).map((c) => ({
@@ -154,7 +182,11 @@ export default function App() {
       labels: null,
       weightScaleMax: c.max_value,
     }));
-    setPreview({ ...survey, questions });
+    applyView({
+      activePage: "admin",
+      editor: null,
+      preview: { ...survey, questions },
+    });
   };
 
   const handleDelete = async (id) => {
@@ -243,7 +275,9 @@ export default function App() {
           primaryColor={preview.primaryColor}
           description={preview.description}
           bgImage={preview.bgImage}
-          onBack={() => setPreview(null)}
+          onBack={() =>
+            applyView({ activePage: "admin", editor: null, preview: null })
+          }
           t={t}
         />
       </>
@@ -258,7 +292,12 @@ export default function App() {
       <>
         <LangSwitcher lang={lang} setLang={setLang} />
         <div className="top-bar">
-          <button className="nav-tab" onClick={() => setEditor(null)}>
+          <button
+            className="nav-tab"
+            onClick={() =>
+              applyView({ activePage: "admin", editor: null, preview: null })
+            }
+          >
             ← {t.backToDashboard}
           </button>
         </div>
@@ -277,7 +316,9 @@ export default function App() {
             className={
               activePage === "admin" ? "nav-tab nav-tab-active" : "nav-tab"
             }
-            onClick={() => setActivePage("admin")}
+            onClick={() =>
+              applyView({ activePage: "admin", editor: null, preview: null })
+            }
           >
             {t.surveysTab}
           </button>
@@ -285,7 +326,13 @@ export default function App() {
             className={
               activePage === "analytics" ? "nav-tab nav-tab-active" : "nav-tab"
             }
-            onClick={() => setActivePage("analytics")}
+            onClick={() =>
+              applyView({
+                activePage: "analytics",
+                editor: null,
+                preview: null,
+              })
+            }
           >
             {t.analyticsTab || "Auswertung"}
           </button>
@@ -293,7 +340,9 @@ export default function App() {
             className={
               activePage === "users" ? "nav-tab nav-tab-active" : "nav-tab"
             }
-            onClick={() => setActivePage("users")}
+            onClick={() =>
+              applyView({ activePage: "users", editor: null, preview: null })
+            }
           >
             {t.usersTab}
           </button>
@@ -339,8 +388,20 @@ export default function App() {
           surveys={surveys}
           t={t}
           lang={lang}
-          onCreate={() => setEditor({ mode: "new" })}
-          onEdit={(survey) => setEditor({ mode: "edit", id: survey.id })}
+          onCreate={() =>
+            applyView({
+              activePage: "admin",
+              editor: { mode: "new" },
+              preview: null,
+            })
+          }
+          onEdit={(survey) =>
+            applyView({
+              activePage: "admin",
+              editor: { mode: "edit", id: survey.id },
+              preview: null,
+            })
+          }
           onPreview={handlePreview}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}

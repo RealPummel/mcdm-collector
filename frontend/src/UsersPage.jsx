@@ -215,6 +215,7 @@ export default function UsersPage({ t }) {
             }}
             placeholder={t.linkGenNamePlaceholder}
             onKeyDown={(e) => e.key === "Enter" && generateLink()}
+            className="link-gen-placeholder"
           />
           <button
             className="add-row-btn"
@@ -251,6 +252,7 @@ export default function UsersPage({ t }) {
                   border: "1px solid #ddd",
                   borderRadius: 4,
                   background: "white",
+                  color: "black",
                 }}
                 onClick={(e) => e.target.select()}
               />

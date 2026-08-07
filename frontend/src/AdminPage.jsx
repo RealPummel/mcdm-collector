@@ -4,19 +4,19 @@ import { supabase } from "./supabaseClient";
 // Default answer scale, pre-filled in the admin's current language. Once the
 // admin edits a label, their text is kept (it's survey content, not UI chrome).
 const defaultLabelsEN = [
-  { value: 1, text: "1 - Very good" },
-  { value: 2, text: "2 - Good" },
+  { value: 1, text: "1 - Very bad" },
+  { value: 2, text: "2 - Bad" },
   { value: 3, text: "3 - Ok" },
-  { value: 4, text: "4 - Bad" },
-  { value: 5, text: "5 - Very bad" },
+  { value: 4, text: "4 - Good" },
+  { value: 5, text: "5 - Very good" },
 ];
 
 const defaultLabelsDE = [
-  { value: 1, text: "1 - Sehr gut" },
-  { value: 2, text: "2 - Gut" },
+  { value: 1, text: "1 - Sehr schlecht" },
+  { value: 2, text: "2 - Schlecht" },
   { value: 3, text: "3 - Okay" },
-  { value: 4, text: "4 - Schlecht" },
-  { value: 5, text: "5 - Sehr schlecht" },
+  { value: 4, text: "4 - Gut" },
+  { value: 5, text: "5 - Sehr gut" },
 ];
 
 const colorOptions = [

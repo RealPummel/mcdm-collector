@@ -46,6 +46,8 @@ const urlHash = typeof window !== "undefined" ? window.location.hash || "" : "";
 const isInviteLink =
   urlHash.includes("type=invite") ||
   urlHash.includes("type=recovery") ||
+  urlHash.includes("error=") ||
+  urlHash.includes("error_code=") ||
   new URLSearchParams(window.location.search).get("register") === "1";
 
 export default function App() {
@@ -231,7 +233,7 @@ export default function App() {
   }
 
   // ── Registrierung: eingeladene Admins setzen ihr Passwort ──
-  if (showRegister && !isLoggedIn) {
+  if (showRegister) {
     return (
       <>
         <LangSwitcher lang={lang} setLang={setLang} />
@@ -241,7 +243,11 @@ export default function App() {
             setShowRegister(false);
             setIsLoggedIn(true);
           }}
-          onBackToLogin={() => setShowRegister(false)}
+          onBackToLogin={async () => {
+            await supabase.auth.signOut();
+            setShowRegister(false);
+            setIsLoggedIn(false);
+          }}
         />
       </>
     );

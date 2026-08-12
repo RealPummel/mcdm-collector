@@ -46,14 +46,16 @@ export default function RegisterPage({ onRegistered, onBackToLogin, t = {} }) {
 
     // Falls die Session erst kurz nach dem Laden ankommt (Token-Verarbeitung),
     // hören wir auch auf Auth-Änderungen.
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      if (session?.user) {
-        setEmail(session.user.email || "");
-        setSessionReady(true);
-        setChecking(false);
-      }
-    });
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!active) return;
+        if (session?.user) {
+          setEmail(session.user.email || "");
+          setSessionReady(true);
+          setChecking(false);
+        }
+      },
+    );
 
     return () => {
       active = false;
@@ -65,21 +67,31 @@ export default function RegisterPage({ onRegistered, onBackToLogin, t = {} }) {
     setError("");
 
     if (!password.trim() || !confirmPassword.trim()) {
-      setError(t.registerFillFields || "Bitte beide Passwort-Felder ausfüllen.");
+      setError(
+        t.registerFillFields || "Bitte beide Passwort-Felder ausfüllen.",
+      );
       return;
     }
     if (password.length < 8) {
-      setError(t.registerPasswordShort || "Das Passwort muss mindestens 8 Zeichen lang sein.");
+      setError(
+        t.registerPasswordShort ||
+          "Das Passwort muss mindestens 8 Zeichen lang sein.",
+      );
       return;
     }
     if (password !== confirmPassword) {
-      setError(t.registerPasswordMismatch || "Die Passwörter stimmen nicht überein.");
+      setError(
+        t.registerPasswordMismatch || "Die Passwörter stimmen nicht überein.",
+      );
       return;
     }
 
     setLoading(true);
     // Passwort für den bereits eingeladenen (und per Token eingeloggten) Nutzer setzen.
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    const { error: updateError } = await supabase.auth.updateUser({
+      password,
+      data: { registration_completed: true },
+    });
     setLoading(false);
 
     if (updateError) {
@@ -96,7 +108,10 @@ export default function RegisterPage({ onRegistered, onBackToLogin, t = {} }) {
         <div className="login-header">
           <div className="login-logo">⬡</div>
           <h1>{t.registerTitle || "Registrierung abschließen"}</h1>
-          <p>{t.registerSubtitle || "Lege dein Passwort fest, um deinen Admin-Zugang zu aktivieren."}</p>
+          <p>
+            {t.registerSubtitle ||
+              "Lege dein Passwort fest, um deinen Admin-Zugang zu aktivieren."}
+          </p>
         </div>
 
         {/* Wird noch geprüft ob ein gültiger Einladungs-Link vorliegt */}
@@ -110,8 +125,7 @@ export default function RegisterPage({ onRegistered, onBackToLogin, t = {} }) {
         {!checking && !sessionReady && (
           <div className="login-form">
             <p className="error-msg">
-              {t.registerNoInvite ||
-                "Kein gültiger Einladungs-Link gefunden. Bitte öffne den Link aus deiner Einladungs-E-Mail erneut."}
+              {t.registerNoInvite || "Kein gültiger Einladungs-Link gefunden."}
             </p>
             <button className="login-btn" onClick={onBackToLogin}>
               {t.backToLogin || "Zurück zur Anmeldung"}
@@ -153,7 +167,11 @@ export default function RegisterPage({ onRegistered, onBackToLogin, t = {} }) {
 
             {error && <p className="error-msg">{error}</p>}
 
-            <button className="login-btn" onClick={handleRegister} disabled={loading}>
+            <button
+              className="login-btn"
+              onClick={handleRegister}
+              disabled={loading}
+            >
               {loading
                 ? t.registerSaving || "Wird gespeichert..."
                 : t.registerSubmit || "Registrierung abschließen"}

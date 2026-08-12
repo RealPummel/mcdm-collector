@@ -70,12 +70,10 @@ export default function App() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-
     const [{ data: projects }, { data: submitted }] = await Promise.all([
       supabase
         .from("projects")
         .select("*, criteria(id, label, max_value), alternatives(name)")
-        .eq("admin_id", user.id)
         .order("created_at", { ascending: false }),
       supabase
         .from("decision_makers")

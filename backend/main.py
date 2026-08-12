@@ -219,7 +219,7 @@ async def list_admin_users(request: Request, user=Depends(get_current_user)):
                 {
                     "id": u.id,
                     "email": u.email,
-                    "status": "active" if getattr(u, "email_confirmed_at", None) else "pending",
+                    "status": "active" if (u.user_metadata or {}).get("registration_completed") else "pending",
                 }
                 for u in users
             ]

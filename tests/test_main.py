@@ -111,6 +111,10 @@ def test_get_project_analytics(client, mock_supabase):
             },
             "get_user_score_avg_by_project": {"10": 4.2},
             "get_weight_avg_by_project": {"1": 3.1},
+            "get_min_and_max_inputs_by_project": {
+                "weights": {"1": {"min": 2.0, "max": 5.0}},
+                "ratings": {"1": {"1": {"min": 3, "max": 5}}},
+            },
         }
         mock = MagicMock()
         mock.execute.return_value.data = data_by_name[name]
@@ -143,6 +147,8 @@ def test_get_project_analytics(client, mock_supabase):
     assert body["weighted_sums"] == {"1": {"10": 6.0}}
     assert body["alternative_score_avg"] == {"10": 4.2}
     assert body["weight_avg"] == {"1": 3.1}
+    assert body["score_range"]["1"]["min_score"] == 6
+    assert body["score_range"]["1"]["max_score"] == 25
 
 
 def test_invite_user_success(client, mock_supabase):
@@ -165,14 +171,14 @@ def test_invite_user_failure_returns_400(client, mock_supabase):
 
 def test_list_admin_users(client, mock_supabase):
     class FakeUser:
-        def __init__(self, id, email, confirmed_at):
+        def __init__(self, id, email, registration_completed):
             self.id = id
             self.email = email
-            self.email_confirmed_at = confirmed_at
+            self.user_metadata = {"registration_completed": registration_completed}
 
     mock_supabase.auth.admin.list_users.return_value = [
-        FakeUser("1", "active@example.com", "2024-01-01T00:00:00Z"),
-        FakeUser("2", "pending@example.com", None),
+        FakeUser("1", "active@example.com", True),
+        FakeUser("2", "pending@example.com", False),
     ]
 
     response = client.get("/api/admin-users")
